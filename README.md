@@ -17,8 +17,10 @@ Create your feature branch from the latest `main` branch:
 ```bash
 git checkout main
 git pull origin main
-git checkout -b feature/EP-XX-short-description
+git checkout -b feature/username/EP-XX-short-description
 ```
+*(Replace `username` with your name/username and `EP-XX` with your actual Jira issue key, e.g., `feature/niviru/EP-7-view-floorplan`)*
+
 
 ### 3. Stage and Commit
 Stage your files and write a commit message prefixed with the Jira issue key:
@@ -30,7 +32,7 @@ git commit -m "EP-XX: description of changes"
 ### 4. Push and Open a Pull Request
 Push your branch to GitHub and create a Pull Request to merge into `main`:
 ```bash
-git push -u origin feature/EP-XX-short-description
+git push -u origin feature/username/EP-XX-short-description
 ```
 
 ### 5. Pull Approved Changes
