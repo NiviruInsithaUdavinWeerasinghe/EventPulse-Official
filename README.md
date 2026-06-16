@@ -37,6 +37,7 @@ git push -u origin feature/username/EP-XX-short-description
 
 ### 5. Create a Pull Request (PR)
 * Open a Pull Request on GitHub to merge your branch into `main`.
+* **PR Title Format:** Use the format `EP-XX: Short descriptive title` (e.g., `EP-31: Create login & registration UIs`).
 * Wait for code review and approval before merging.
 
 ### 6. Update Your Local Workspace
