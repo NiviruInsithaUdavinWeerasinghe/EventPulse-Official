@@ -30,10 +30,11 @@ git commit -m "EP-XX: description of changes"
 ```
 
 ### 4. Push and Open a Pull Request
-Push your branch to GitHub and create a Pull Request to merge into `main`:
+* Push your branch to GitHub:
 ```bash
 git push -u origin feature/username/EP-XX-short-description
 ```
+* **PR Title Format:** Use the format `EP-XX: Short descriptive title` (e.g., `EP-31: Create login & registration UIs`).
 
 ### 5. Pull Approved Changes
 Once the PR is merged on GitHub, pull the changes locally:
