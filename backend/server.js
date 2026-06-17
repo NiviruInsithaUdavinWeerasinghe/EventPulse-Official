@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import connectDB from './config/db.js';
-import floorplanRoutes from './routes/floorplanRoutes.js';
+import eventRoutes from './routes/eventRoutes.js';
 
 dotenv.config();
 
@@ -21,7 +21,7 @@ app.get('/health', (req, res) => {
 });
 
 // API Routes
-app.use('/api/floorplans', floorplanRoutes);
+app.use('/api/events', eventRoutes);
 
 app.listen(PORT, () => {
   console.log(`EventPulse Official backend server running on port ${PORT}`);
