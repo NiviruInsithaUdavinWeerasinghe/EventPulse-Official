@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { User, Mail, Lock, Phone, ArrowRight } from "lucide-react";
 
 export default function Register() {
@@ -10,14 +10,40 @@ export default function Register() {
     password: "",
     confirmPassword: "",
   });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   const handleChange = (e) => {
     setFormData((prev) => ({ ...prev, [e.target.id]: e.target.value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // UI only
+    setError("");
+    if (formData.password !== formData.confirmPassword)
+      return setError("Passwords do not match.");
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: formData.fullName,
+          email: formData.email,
+          phone: formData.phone,
+          password: formData.password,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) return setError(data.message || "Registration failed.");
+      localStorage.setItem("token", data.token);
+      navigate("/dashboard");
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -173,12 +199,17 @@ export default function Register() {
           </span>
         </label>
 
+        {error && (
+          <p className="text-sm text-red-500 dark:text-red-400 text-center">{error}</p>
+        )}
+
         <button
           type="submit"
-          className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-all duration-200 active:scale-[0.98] shadow-md shadow-indigo-600/20 mt-2"
+          disabled={loading}
+          className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-semibold py-2.5 px-4 rounded-lg transition-all duration-200 active:scale-[0.98] shadow-md shadow-indigo-600/20 mt-2"
         >
-          Create Account
-          <ArrowRight size={18} />
+          {loading ? "Creating account..." : "Create Account"}
+          {!loading && <ArrowRight size={18} />}
         </button>
       </form>
 
