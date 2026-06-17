@@ -80,7 +80,6 @@ export default function App({ onNavigate }) {
         <div className="modal-overlay" onClick={closeDemoModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <button className="modal-close" onClick={closeDemoModal}>&times;</button>
-            
             {!submitSuccess ? (
               <>
                 <h3 className="modal-title">Book a Demo</h3>
@@ -88,49 +87,19 @@ export default function App({ onNavigate }) {
                 <form onSubmit={submitDemoRequest}>
                   <div className="form-group">
                     <label htmlFor="name">Full Name</label>
-                    <input
-                      type="text"
-                      id="name"
-                      name="name"
-                      className="form-input"
-                      value={demoRequest.name}
-                      onChange={handleInputChange}
-                      required
-                    />
+                    <input type="text" id="name" name="name" className="form-input" value={demoRequest.name} onChange={handleInputChange} required />
                   </div>
                   <div className="form-group">
                     <label htmlFor="email">Work Email</label>
-                    <input
-                      type="email"
-                      id="email"
-                      name="email"
-                      className="form-input"
-                      value={demoRequest.email}
-                      onChange={handleInputChange}
-                      required
-                    />
+                    <input type="email" id="email" name="email" className="form-input" value={demoRequest.email} onChange={handleInputChange} required />
                   </div>
                   <div className="form-group">
                     <label htmlFor="company">Company Name</label>
-                    <input
-                      type="text"
-                      id="company"
-                      name="company"
-                      className="form-input"
-                      value={demoRequest.company}
-                      onChange={handleInputChange}
-                      required
-                    />
+                    <input type="text" id="company" name="company" className="form-input" value={demoRequest.company} onChange={handleInputChange} required />
                   </div>
                   <div className="form-group">
                     <label htmlFor="eventType">Primary Event Type</label>
-                    <select
-                      id="eventType"
-                      name="eventType"
-                      className="form-select"
-                      value={demoRequest.eventType}
-                      onChange={handleInputChange}
-                    >
+                    <select id="eventType" name="eventType" className="form-select" value={demoRequest.eventType} onChange={handleInputChange}>
                       <option value="Exhibition">Exhibition / Tradeshow</option>
                       <option value="Conference">Corporate Conference</option>
                       <option value="Festival">Festival / Public Event</option>

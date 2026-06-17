@@ -17,9 +17,10 @@ Always create your branch from the latest `main` branch:
 ```bash
 git checkout main
 git pull origin main
-git checkout -b feature/EP-XX-short-description
+git checkout -b feature/username/EP-XX-short-description
 ```
-*(Replace `EP-XX` with your actual Jira issue key, e.g., `feature/EP-7-view-floorplan`)*
+*(Replace `username` with your name/username and `EP-XX` with your actual Jira issue key, e.g., `feature/niviru/EP-7-view-floorplan`)*
+
 
 ### 3. Commit with Jira Issue Key
 Stage your files and write a commit message prefixed with your Jira issue key:
@@ -31,11 +32,12 @@ git commit -m "EP-XX: your detailed commit message here"
 ### 4. Push to Remote Branch
 Push your branch to GitHub:
 ```bash
-git push -u origin feature/EP-XX-short-description
+git push -u origin feature/username/EP-XX-short-description
 ```
 
 ### 5. Create a Pull Request (PR)
 * Open a Pull Request on GitHub to merge your branch into `main`.
+* **PR Title Format:** Use the format `EP-XX: Short descriptive title` (e.g., `EP-31: Create login & registration UIs`).
 * Wait for code review and approval before merging.
 
 ### 6. Update Your Local Workspace
