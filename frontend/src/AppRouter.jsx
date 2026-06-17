@@ -1,11 +1,24 @@
 import React, { useState } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar.jsx';
 import App from './App.jsx';
 import EventsPage from './pages/EventsPage.jsx';
 import CreateEvent from './pages/CreateEvent.jsx';
 import MapViewer from './pages/MapViewer.jsx';
+import Login from './pages/Login.jsx';
+import Register from './pages/Register.jsx';
 
-export default function AppRouter() {
+// Wrapper for Evan's login/register — centred on a dark full-page layout
+function AuthLayout({ children }) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#030712] p-6">
+      {children}
+    </div>
+  );
+}
+
+// Main app with our state-based page router
+function MainApp() {
   const [currentPage, setCurrentPage] = useState('landing');
   const [selectedEventId, setSelectedEventId] = useState(null);
 
@@ -32,17 +45,31 @@ export default function AppRouter() {
 
   return (
     <div>
-      {/* Navbar is hidden in map-viewer so the map can use full height */}
       {!isMapViewer && (
-        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 1.5rem' }}>
+        <div className="max-w-[1200px] mx-auto px-6">
           <Navbar currentPage={currentPage} onNavigate={navigate} />
         </div>
       )}
-      {/* MapViewer gets its own back button in its topbar */}
-      {isMapViewer && (
-        <MapViewer eventId={selectedEventId} onNavigate={navigate} />
-      )}
-      {!isMapViewer && renderPage()}
+      {isMapViewer
+        ? <MapViewer eventId={selectedEventId} onNavigate={navigate} />
+        : renderPage()
+      }
     </div>
+  );
+}
+
+export default function AppRouter() {
+  return (
+    <Routes>
+      {/* Evan's auth pages */}
+      <Route path="/login" element={<AuthLayout><Login /></AuthLayout>} />
+      <Route path="/register" element={<AuthLayout><Register /></AuthLayout>} />
+
+      {/* After login, Evan navigates to /dashboard — redirect to landing for now */}
+      <Route path="/dashboard" element={<Navigate to="/" replace />} />
+
+      {/* All our pages live at / */}
+      <Route path="/*" element={<MainApp />} />
+    </Routes>
   );
 }
