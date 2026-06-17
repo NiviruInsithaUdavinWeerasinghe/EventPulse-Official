@@ -1,4 +1,6 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
+
 
 export default function Navbar({ currentPage, onNavigate }) {
   return (
@@ -41,6 +43,12 @@ export default function Navbar({ currentPage, onNavigate }) {
         >
           Events
         </a>
+        <Link
+          to="/login"
+          className="text-sm font-medium text-slate-400 hover:text-slate-50 transition-colors duration-200 no-underline"
+        >
+          Login
+        </Link>
         <button
           id="create-event-nav-btn"
           onClick={() => onNavigate('create-event')}
