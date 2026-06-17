@@ -1,6 +1,5 @@
 import multer from 'multer';
 
-// Store file in memory as a buffer so we can stream it to Cloudinary
 const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
@@ -12,10 +11,11 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
+// Accepts two named fields: 'banner' and 'floorMap'
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB per file
 });
 
 export default upload;

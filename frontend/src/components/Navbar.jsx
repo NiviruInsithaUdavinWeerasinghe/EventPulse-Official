@@ -28,17 +28,17 @@ export default function Navbar({ currentPage, onNavigate }) {
         </a>
         <a
           href="#"
-          className={`nav-link ${currentPage === 'viewer' ? 'nav-link--active' : ''}`}
-          onClick={(e) => { e.preventDefault(); onNavigate('viewer'); }}
+          className={`nav-link ${currentPage === 'events' ? 'nav-link--active' : ''}`}
+          onClick={(e) => { e.preventDefault(); onNavigate('events'); }}
         >
-          Floor Maps
+          Events
         </a>
         <button
-          id="upload-nav-btn"
-          className={`btn-secondary ${currentPage === 'upload' ? 'btn-secondary--active' : ''}`}
-          onClick={() => onNavigate('upload')}
+          id="create-event-nav-btn"
+          className={`btn-secondary ${currentPage === 'create-event' ? 'btn-secondary--active' : ''}`}
+          onClick={() => onNavigate('create-event')}
         >
-          Upload Map
+          Create Event
         </button>
       </nav>
     </header>
