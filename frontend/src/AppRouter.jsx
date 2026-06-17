@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import Navbar from './components/Navbar.jsx';
-import './components/Navbar.css';
 import App from './App.jsx';
 import EventsPage from './pages/EventsPage.jsx';
 import CreateEvent from './pages/CreateEvent.jsx';
