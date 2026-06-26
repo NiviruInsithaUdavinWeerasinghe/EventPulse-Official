@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar.jsx';
 import App from './App.jsx';
@@ -10,7 +10,7 @@ import Register from './pages/Register.jsx';
 import OrganizerDashboard from './pages/OrganizerDashboard.jsx';
 import VendorPortal from './pages/VendorPortal.jsx';
 import CustomerList from './pages/CustomerList.jsx';
-// import ProfileUpdateForm from './components/ProfileUpdateForm.jsx';
+import ProfileUpdateForm from './components/ProfileUpdateForm.jsx';
 
 // ─── Helper: decode JWT role from localStorage ──────────────────────────────
 function getRoleFromToken() {
@@ -138,11 +138,11 @@ export default function AppRouter() {
       } />
 
       {/* EP-33: Profile update form */}
-      {/* <Route path="/business/profile" element={
+      <Route path="/business/profile" element={
         <ProtectedRoute allowedRoles={['organizer', 'vendor', 'customer']}>
           <ProfileUpdateForm />
-        </ProtectedRoute> */}
-      {/* } /> */}
+        </ProtectedRoute>
+      } />
 
       {/* All landing/event pages */}
       <Route path="/*" element={<MainApp />} />

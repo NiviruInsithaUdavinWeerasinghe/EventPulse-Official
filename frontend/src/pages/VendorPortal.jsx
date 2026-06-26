@@ -1,7 +1,15 @@
+import { useNavigate } from 'react-router-dom';
+
 export default function VendorPortal() {
+  const navigate = useNavigate();
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     window.location.href = '/login';
+  };
+
+  const handleClick = (item) => {
+    if (item === 'Business Profile') navigate('/business/profile');
   };
 
   return (
@@ -14,7 +22,11 @@ export default function VendorPortal() {
         <p className="text-purple-400 mb-8">Welcome! Manage your stalls and products here.</p>
         <div className="grid grid-cols-3 gap-4 mb-8">
           {['My Stalls', 'Active Tags', 'Business Profile'].map((item) => (
-            <div key={item} className="rounded-xl border border-purple-500/20 bg-white/5 p-4 text-slate-300 text-sm font-medium hover:border-purple-400 hover:text-white transition cursor-pointer">
+            <div
+              key={item}
+              onClick={() => handleClick(item)}
+              className="rounded-xl border border-purple-500/20 bg-white/5 p-4 text-slate-300 text-sm font-medium hover:border-purple-400 hover:text-white transition cursor-pointer"
+            >
               {item}
             </div>
           ))}
