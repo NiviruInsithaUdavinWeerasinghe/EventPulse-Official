@@ -4,13 +4,13 @@ import User from '../models/User.js';
 
 const router = express.Router();
 
-const signToken = (id) =>
-  jwt.sign({ id }, process.env.JWT_SECRET || 'eventpulse_secret', { expiresIn: '7d' });
+const signToken = (id, role) =>
+  jwt.sign({ id, role }, process.env.JWT_SECRET || 'eventpulse_secret', { expiresIn: '7d' });
 
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
   try {
-    const { fullName, email, phone, password } = req.body;
+    const { fullName, email, phone, password, role } = req.body;
 
     if (!fullName || !email || !phone || !password)
       return res.status(400).json({ message: 'All fields are required.' });
@@ -18,8 +18,8 @@ router.post('/register', async (req, res) => {
     if (await User.findOne({ email }))
       return res.status(409).json({ message: 'Email already in use.' });
 
-    const user = await User.create({ fullName, email, phone, password });
-    res.status(201).json({ token: signToken(user._id), user: { id: user._id, fullName: user.fullName, email: user.email } });
+    const user = await User.create({ fullName, email, phone, password, role: role || 'customer' });
+    res.status(201).json({ token: signToken(user._id, user.role), user: { id: user._id, fullName: user.fullName, email: user.email, role: user.role } });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -37,7 +37,7 @@ router.post('/login', async (req, res) => {
     if (!user || !(await user.matchPassword(password)))
       return res.status(401).json({ message: 'Invalid email or password.' });
 
-    res.json({ token: signToken(user._id), user: { id: user._id, fullName: user.fullName, email: user.email } });
+    res.json({ token: signToken(user._id, user.role), user: { id: user._id, fullName: user.fullName, email: user.email, role: user.role } });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
