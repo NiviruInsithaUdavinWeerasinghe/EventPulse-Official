@@ -7,8 +7,54 @@ import CreateEvent from './pages/CreateEvent.jsx';
 import MapViewer from './pages/MapViewer.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
+import OrganizerDashboard from './pages/OrganizerDashboard.jsx';
+import VendorPortal from './pages/VendorPortal.jsx';
+import CustomerList from './pages/CustomerList.jsx';
+// import ProfileUpdateForm from './components/ProfileUpdateForm.jsx';
 
-// Wrapper for Evan's login/register — centred on a dark full-page layout
+// ─── Helper: decode JWT role from localStorage ──────────────────────────────
+function getRoleFromToken() {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    // Check token hasn't expired
+    if (payload.exp && payload.exp * 1000 < Date.now()) {
+      localStorage.removeItem('token');
+      return null;
+    }
+    return payload.role || null;
+  } catch {
+    return null;
+  }
+}
+
+// ─── Protected Route: redirects to /login if not authenticated ──────────────
+function ProtectedRoute({ children, allowedRoles }) {
+  const role = getRoleFromToken();
+
+  if (!role) return <Navigate to="/login" replace />;
+
+  if (allowedRoles && !allowedRoles.includes(role)) {
+    // Redirect to their correct dashboard if they hit the wrong route
+    if (role === 'organizer') return <Navigate to="/organizer/dashboard" replace />;
+    if (role === 'vendor')    return <Navigate to="/vendor/portal" replace />;
+    return <Navigate to="/customer/list" replace />;
+  }
+
+  return children;
+}
+
+// ─── Role-based redirect after login ────────────────────────────────────────
+function RoleRedirect() {
+  const role = getRoleFromToken();
+  if (!role)                  return <Navigate to="/login" replace />;
+  if (role === 'organizer')   return <Navigate to="/organizer/dashboard" replace />;
+  if (role === 'vendor')      return <Navigate to="/vendor/portal" replace />;
+  return <Navigate to="/customer/list" replace />;
+}
+
+// ─── Auth layout wrapper ─────────────────────────────────────────────────────
 function AuthLayout({ children }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#030712] p-6">
@@ -17,7 +63,7 @@ function AuthLayout({ children }) {
   );
 }
 
-// Main app with our state-based page router
+// ─── Main app with state-based page router ───────────────────────────────────
 function MainApp() {
   const [currentPage, setCurrentPage] = useState('landing');
   const [selectedEventId, setSelectedEventId] = useState(null);
@@ -58,18 +104,49 @@ function MainApp() {
   );
 }
 
+// ─── Main Router ─────────────────────────────────────────────────────────────
 export default function AppRouter() {
   return (
     <Routes>
-      {/* Evan's auth pages */}
-      <Route path="/login" element={<AuthLayout><Login /></AuthLayout>} />
+
+      {/* Auth pages */}
+      <Route path="/login"    element={<AuthLayout><Login /></AuthLayout>} />
       <Route path="/register" element={<AuthLayout><Register /></AuthLayout>} />
 
-      {/* After login, Evan navigates to /dashboard — redirect to landing for now */}
-      <Route path="/dashboard" element={<Navigate to="/" replace />} />
+      {/* Role-based redirect after login */}
+      <Route path="/dashboard" element={<RoleRedirect />} />
 
-      {/* All our pages live at / */}
+      {/* Organizer routes */}
+      <Route path="/organizer/dashboard" element={
+        <ProtectedRoute allowedRoles={['organizer']}>
+          <OrganizerDashboard />
+        </ProtectedRoute>
+      } />
+
+      {/* Vendor routes */}
+      <Route path="/vendor/portal" element={
+        <ProtectedRoute allowedRoles={['vendor']}>
+          <VendorPortal />
+        </ProtectedRoute>
+      } />
+
+      {/* Customer routes */}
+      <Route path="/customer/list" element={
+        <ProtectedRoute allowedRoles={['customer']}>
+          <CustomerList />
+        </ProtectedRoute>
+      } />
+
+      {/* EP-33: Profile update form */}
+      {/* <Route path="/business/profile" element={
+        <ProtectedRoute allowedRoles={['organizer', 'vendor', 'customer']}>
+          <ProfileUpdateForm />
+        </ProtectedRoute> */}
+      {/* } /> */}
+
+      {/* All landing/event pages */}
       <Route path="/*" element={<MainApp />} />
+
     </Routes>
   );
 }
