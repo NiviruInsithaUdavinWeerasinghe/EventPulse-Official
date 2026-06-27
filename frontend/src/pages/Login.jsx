@@ -23,11 +23,7 @@ export default function Login() {
       if (!res.ok) return setError(data.message || "Login failed.");
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
-      const role = data.user?.role || 'customer';
-      if (role === 'customer') navigate('/customer/dashboard');
-      else if (role === 'organizer') navigate('/organizer/dashboard');
-      else if (role === 'vendor') navigate('/vendor/dashboard');
-      else navigate('/dashboard');
+      navigate("/dashboard"); // AppRouter's RoleRedirect dispatches by JWT role
     } catch {
       setError("Network error. Please try again.");
     } finally {
