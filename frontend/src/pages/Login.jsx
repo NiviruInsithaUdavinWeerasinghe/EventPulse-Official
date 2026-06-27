@@ -22,7 +22,12 @@ export default function Login() {
       const data = await res.json();
       if (!res.ok) return setError(data.message || "Login failed.");
       localStorage.setItem("token", data.token);
-      navigate("/dashboard");
+      localStorage.setItem("user", JSON.stringify(data.user));
+      const role = data.user?.role || 'customer';
+      if (role === 'customer') navigate('/customer/dashboard');
+      else if (role === 'organizer') navigate('/organizer/dashboard');
+      else if (role === 'vendor') navigate('/vendor/dashboard');
+      else navigate('/dashboard');
     } catch {
       setError("Network error. Please try again.");
     } finally {
