@@ -9,6 +9,7 @@ export default function Register() {
     phone: "",
     password: "",
     confirmPassword: "",
+    role: "customer",
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -33,6 +34,7 @@ export default function Register() {
           email: formData.email,
           phone: formData.phone,
           password: formData.password,
+          role: formData.role,
         }),
       });
       const data = await res.json();
@@ -46,6 +48,12 @@ export default function Register() {
     }
   };
 
+  const roles = [
+    { value: "customer",  label: "Customer",  desc: "Browse events & explore floorplans", icon: "🎟️" },
+    { value: "vendor",    label: "Vendor",     desc: "Manage stalls & business profile",   icon: "🏪" },
+    { value: "organizer", label: "Organizer",  desc: "Create & coordinate events",         icon: "🗂️" },
+  ];
+
   return (
     <div className="w-full max-w-md my-8 px-6 py-8 bg-white dark:bg-slate-800 rounded-2xl shadow-xl dark:shadow-slate-900/50 border border-slate-100 dark:border-slate-700 transition-all duration-300">
       <div className="text-center mb-8">
@@ -58,11 +66,10 @@ export default function Register() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
+
+        {/* Full Name */}
         <div className="space-y-2">
-          <label
-            htmlFor="fullName"
-            className="text-sm font-medium text-slate-700 dark:text-slate-300 block"
-          >
+          <label htmlFor="fullName" className="text-sm font-medium text-slate-700 dark:text-slate-300 block">
             Full Name
           </label>
           <div className="relative group">
@@ -70,22 +77,16 @@ export default function Register() {
               <User size={18} />
             </div>
             <input
-              id="fullName"
-              type="text"
-              value={formData.fullName}
-              onChange={handleChange}
+              id="fullName" type="text" value={formData.fullName} onChange={handleChange}
               className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 outline-none"
-              placeholder="Enter your full name"
-              required
+              placeholder="Enter your full name" required
             />
           </div>
         </div>
 
+        {/* Email */}
         <div className="space-y-2">
-          <label
-            htmlFor="email"
-            className="text-sm font-medium text-slate-700 dark:text-slate-300 block"
-          >
+          <label htmlFor="email" className="text-sm font-medium text-slate-700 dark:text-slate-300 block">
             Email Address
           </label>
           <div className="relative group">
@@ -93,22 +94,16 @@ export default function Register() {
               <Mail size={18} />
             </div>
             <input
-              id="email"
-              type="email"
-              value={formData.email}
-              onChange={handleChange}
+              id="email" type="email" value={formData.email} onChange={handleChange}
               className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 outline-none"
-              placeholder="Enter your email"
-              required
+              placeholder="Enter your email" required
             />
           </div>
         </div>
 
+        {/* Phone */}
         <div className="space-y-2">
-          <label
-            htmlFor="phone"
-            className="text-sm font-medium text-slate-700 dark:text-slate-300 block"
-          >
+          <label htmlFor="phone" className="text-sm font-medium text-slate-700 dark:text-slate-300 block">
             Phone Number
           </label>
           <div className="relative group">
@@ -116,22 +111,41 @@ export default function Register() {
               <Phone size={18} />
             </div>
             <input
-              id="phone"
-              type="tel"
-              value={formData.phone}
-              onChange={handleChange}
+              id="phone" type="tel" value={formData.phone} onChange={handleChange}
               className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 outline-none"
-              placeholder="Enter your phone number"
-              required
+              placeholder="Enter your phone number" required
             />
           </div>
         </div>
 
+        {/* Role selector — EP-76 */}
         <div className="space-y-2">
-          <label
-            htmlFor="password"
-            className="text-sm font-medium text-slate-700 dark:text-slate-300 block"
-          >
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300 block">
+            I am a...
+          </label>
+          <div className="grid grid-cols-3 gap-2">
+            {roles.map(({ value, label, desc, icon }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setFormData((prev) => ({ ...prev, role: value }))}
+                className={`flex flex-col items-center gap-1 p-3 rounded-xl border text-center transition-all duration-200
+                  ${formData.role === value
+                    ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
+                    : "border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-indigo-300 hover:text-indigo-500"
+                  }`}
+              >
+                <span className="text-xl">{icon}</span>
+                <span className="text-xs font-semibold">{label}</span>
+                <span className="text-[10px] leading-tight opacity-70">{desc}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Password */}
+        <div className="space-y-2">
+          <label htmlFor="password" className="text-sm font-medium text-slate-700 dark:text-slate-300 block">
             Password
           </label>
           <div className="relative group">
@@ -139,22 +153,16 @@ export default function Register() {
               <Lock size={18} />
             </div>
             <input
-              id="password"
-              type="password"
-              value={formData.password}
-              onChange={handleChange}
+              id="password" type="password" value={formData.password} onChange={handleChange}
               className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 outline-none"
-              placeholder="Create a password"
-              required
+              placeholder="Create a password" required
             />
           </div>
         </div>
 
+        {/* Confirm Password */}
         <div className="space-y-2">
-          <label
-            htmlFor="confirmPassword"
-            className="text-sm font-medium text-slate-700 dark:text-slate-300 block"
-          >
+          <label htmlFor="confirmPassword" className="text-sm font-medium text-slate-700 dark:text-slate-300 block">
             Confirm Password
           </label>
           <div className="relative group">
@@ -162,50 +170,36 @@ export default function Register() {
               <Lock size={18} />
             </div>
             <input
-              id="confirmPassword"
-              type="password"
-              value={formData.confirmPassword}
-              onChange={handleChange}
+              id="confirmPassword" type="password" value={formData.confirmPassword} onChange={handleChange}
               className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 outline-none"
-              placeholder="Confirm your password"
-              required
+              placeholder="Confirm your password" required
             />
           </div>
         </div>
 
+        {/* Terms */}
         <label className="flex items-start gap-3 mt-4 cursor-pointer group">
           <div className="relative flex items-center justify-center mt-0.5">
             <input
-              type="checkbox"
-              required
+              type="checkbox" required
               className="peer shrink-0 appearance-none w-4 h-4 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 checked:bg-indigo-500 checked:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all"
             />
-            <svg
-              className="absolute w-3 h-3 pointer-events-none opacity-0 peer-checked:opacity-100 text-white fill-current transition-opacity"
-              viewBox="0 0 20 20"
-            >
+            <svg className="absolute w-3 h-3 pointer-events-none opacity-0 peer-checked:opacity-100 text-white fill-current transition-opacity" viewBox="0 0 20 20">
               <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
             </svg>
           </div>
           <span className="text-sm text-slate-600 dark:text-slate-400 group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors leading-relaxed">
             I agree to the{" "}
-            <a href="#terms" className="text-indigo-600 dark:text-indigo-400 hover:underline">
-              Terms & Conditions
-            </a>{" "}
+            <a href="#terms" className="text-indigo-600 dark:text-indigo-400 hover:underline">Terms & Conditions</a>{" "}
             and{" "}
-            <a href="#privacy" className="text-indigo-600 dark:text-indigo-400 hover:underline">
-              Privacy Policy
-            </a>
+            <a href="#privacy" className="text-indigo-600 dark:text-indigo-400 hover:underline">Privacy Policy</a>
           </span>
         </label>
 
-        {error && (
-          <p className="text-sm text-red-500 dark:text-red-400 text-center">{error}</p>
-        )}
+        {error && <p className="text-sm text-red-500 dark:text-red-400 text-center">{error}</p>}
 
         <button
-          type="submit"
-          disabled={loading}
+          type="submit" disabled={loading}
           className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-semibold py-2.5 px-4 rounded-lg transition-all duration-200 active:scale-[0.98] shadow-md shadow-indigo-600/20 mt-2"
         >
           {loading ? "Creating account..." : "Create Account"}
@@ -235,10 +229,7 @@ export default function Register() {
 
       <div className="mt-8 text-center text-sm text-slate-600 dark:text-slate-400">
         Already have an account?{" "}
-        <Link
-          to="/login"
-          className="font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 transition-colors"
-        >
+        <Link to="/login" className="font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 transition-colors">
           Sign In
         </Link>
       </div>
