@@ -92,7 +92,7 @@ export default function EventManagement({ searchQuery }) {
           <p className="text-slate-500 dark:text-slate-400 text-sm">Create, edit, analyze, and oversee your exhibition registries.</p>
         </div>
         <button 
-          onClick={() => setIsCreateModalOpen(true)}
+          onClick={() => navigate('/organizer/dashboard/create-event')}
           className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs md:text-sm px-4 py-2.5 rounded-xl shadow-sm cursor-pointer hover:shadow-md transition-all active:scale-[0.98]"
         >
           <Plus size={16} />
@@ -218,6 +218,7 @@ export default function EventManagement({ searchQuery }) {
                   <BarChart3 size={15} />
                 </button>
                 <button 
+                  onClick={() => navigate(`/organizer/dashboard/edit-event/${evt.id}`)}
                   title="Edit details" 
                   className="p-2 text-slate-500 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/10 rounded-lg border border-slate-200 dark:border-zinc-800 cursor-pointer transition-all"
                 >
@@ -235,85 +236,6 @@ export default function EventManagement({ searchQuery }) {
           </div>
         ))}
       </div>
-
-      {/* ── Create New Event Modal ──────────────────────────── */}
-      {isCreateModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/40 dark:bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl w-full max-w-md shadow-xl overflow-hidden animate-slide-up">
-            <div className="px-6 py-4 border-b border-slate-100 dark:border-zinc-800 flex justify-between items-center">
-              <h3 className="font-bold text-slate-950 dark:text-white">Create New Event</h3>
-              <button 
-                onClick={() => setIsCreateModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg cursor-pointer"
-              >
-                &times;
-              </button>
-            </div>
-            <form onSubmit={handleCreate} className="p-6 space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">Event Title</label>
-                <input 
-                  type="text" 
-                  required
-                  placeholder="e.g. Expo Trade Show 2026"
-                  className="w-full bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-slate-950 dark:text-white text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                  value={newEvent.name}
-                  onChange={e => setNewEvent({...newEvent, name: e.target.value})}
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">Venue Location</label>
-                <input 
-                  type="text" 
-                  required
-                  placeholder="e.g. Convention Center Hall A"
-                  className="w-full bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-slate-950 dark:text-white text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                  value={newEvent.venue}
-                  onChange={e => setNewEvent({...newEvent, venue: e.target.value})}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">Date</label>
-                  <input 
-                    type="date" 
-                    required
-                    className="w-full bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-slate-950 dark:text-white text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                    value={newEvent.date}
-                    onChange={e => setNewEvent({...newEvent, date: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">Stalls Count</label>
-                  <input 
-                    type="number" 
-                    required
-                    className="w-full bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-slate-950 dark:text-white text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                    value={newEvent.stallsConfigured}
-                    onChange={e => setNewEvent({...newEvent, stallsConfigured: e.target.value})}
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-3 justify-end pt-4">
-                <button 
-                  type="button"
-                  onClick={() => setIsCreateModalOpen(false)}
-                  className="px-4 py-2 text-xs font-semibold border border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-slate-400 rounded-xl hover:bg-slate-50 dark:hover:bg-zinc-800 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit"
-                  className="px-4 py-2 text-xs font-semibold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 cursor-pointer"
-                >
-                  Create Event
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
     </div>
   );

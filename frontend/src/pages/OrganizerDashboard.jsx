@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Calendar, 
@@ -29,14 +29,24 @@ import VendorApprovals from '../components/organizer/VendorApprovals.jsx';
 import SettlementAudit from '../components/organizer/SettlementAudit.jsx';
 import SettingsView from '../components/organizer/SettingsView.jsx';
 import SupportView from '../components/organizer/SupportView.jsx';
+import CreateEvent from './CreateEvent.jsx';
 
 export default function OrganizerDashboard() {
   const navigate = useNavigate();
+  const { tab, eventId } = useParams();
 
-  // Navigation tab state
-  const [activeTab, setActiveTab] = useState('dashboard');
+  // Active tab parser
+  let activeTab = tab || 'dashboard';
+  if (window.location.pathname.includes('/edit-event/')) {
+    activeTab = 'edit-event';
+  }
+  
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const setActiveTab = (newTab) => {
+    navigate(`/organizer/dashboard/${newTab}`);
+  };
 
   // Dropdown states
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -129,7 +139,18 @@ export default function OrganizerDashboard() {
   ];
 
   // Get active tab heading name
-  const activeTabName = [...mainNavs, ...utilityNavs].find(n => n.id === activeTab)?.label || 'Workspace';
+  const activeTabName = activeTab === 'edit-event' ? 'Edit Event Details' : ([...mainNavs, ...utilityNavs].find(n => n.id === activeTab)?.label || 'Workspace');
+
+  // Fetch dynamic user profile from localStorage
+  const getUserData = () => {
+    try {
+      return JSON.parse(localStorage.getItem('user')) || { fullName: 'Organizer User' };
+    } catch {
+      return { fullName: 'Organizer User' };
+    }
+  };
+  const profileUser = getUserData();
+  const initials = profileUser.fullName ? profileUser.fullName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'OU';
 
   // Sidebar Component Wrapper
   const SidebarContent = () => (
@@ -150,10 +171,10 @@ export default function OrganizerDashboard() {
       {/* ── Organizer Profile ────────────────────────────── */}
       <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-zinc-900/50 border border-slate-200/60 dark:border-zinc-900/80 mb-6">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold shadow-xs">
-          AM
+          {initials}
         </div>
         <div className="min-w-0 flex-1">
-          <h4 className="text-xs font-extrabold text-slate-900 dark:text-white truncate">Alex Mercer</h4>
+          <h4 className="text-xs font-extrabold text-slate-900 dark:text-white truncate">{profileUser.fullName}</h4>
           <p className="text-[10px] text-slate-500 truncate mt-0.5">Lead Coordinator</p>
         </div>
       </div>
@@ -173,7 +194,7 @@ export default function OrganizerDashboard() {
               }}
               className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-bold text-xs cursor-pointer transition-all ${
                 isActive 
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' 
+                  ? 'bg-indigo-650 text-white shadow-md shadow-indigo-650/10' 
                   : 'hover:bg-slate-100 dark:hover:bg-zinc-900/80 text-slate-600 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-zinc-150'
               }`}
             >
@@ -208,7 +229,7 @@ export default function OrganizerDashboard() {
               }}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-bold text-xs cursor-pointer transition-all ${
                 isActive 
-                  ? 'bg-indigo-600 text-white shadow-md' 
+                  ? 'bg-indigo-650 text-white shadow-md' 
                   : 'hover:bg-slate-100 dark:hover:bg-zinc-900/80 text-slate-600 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-zinc-150'
               }`}
             >
@@ -238,6 +259,10 @@ export default function OrganizerDashboard() {
         return <MainDashboard setActiveTab={setActiveTab} searchQuery={searchQuery} />;
       case 'events':
         return <EventManagement searchQuery={searchQuery} />;
+      case 'create-event':
+        return <CreateEvent onNavigate={(target) => navigate(`/organizer/dashboard/events`)} />;
+      case 'edit-event':
+        return <CreateEvent onNavigate={(target) => navigate(`/organizer/dashboard/events`)} />;
       case 'blueprints':
         return <BlueprintUploads />;
       case 'approvals':
@@ -376,7 +401,7 @@ export default function OrganizerDashboard() {
                 className="flex items-center gap-1.5 p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-900 cursor-pointer transition-colors"
               >
                 <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white font-extrabold flex items-center justify-center text-xs">
-                  AM
+                  {initials}
                 </div>
                 <ChevronDown size={14} className="text-slate-400" />
               </button>
@@ -388,8 +413,8 @@ export default function OrganizerDashboard() {
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="px-4 py-2 border-b border-slate-100 dark:border-zinc-850">
-                    <p className="text-slate-900 dark:text-white font-extrabold">Alex Mercer</p>
-                    <p className="text-[10px] text-slate-500 font-normal mt-0.5">alex.mercer@eventpulse.com</p>
+                    <p className="text-slate-900 dark:text-white font-extrabold">{profileUser.fullName}</p>
+                    <p className="text-[10px] text-slate-500 font-normal mt-0.5">{profileUser.email || 'organizer@eventpulse.com'}</p>
                   </div>
                   
                   <button 

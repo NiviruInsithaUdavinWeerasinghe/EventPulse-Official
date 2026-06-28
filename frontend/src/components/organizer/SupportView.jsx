@@ -160,6 +160,13 @@ export default function SupportView() {
 
       </div>
 
+      {/* Description tag statement */}
+      <div className="text-center pt-8 pb-4">
+        <p className="text-orange-500 font-extrabold text-2xl tracking-wide uppercase animate-pulse">
+          will give a purpose for this section later
+        </p>
+      </div>
+
     </div>
   );
 }
