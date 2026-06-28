@@ -164,17 +164,28 @@ function QrModal({ balance, onClose }) {
   );
 }
 
-// ... (kept for brevity, imports and helper functions remain same)
-
 /* ─── Ticket Card ───────────────────────────────────────── */
 function TicketCard({ ticket }) {
+  const getThemeDetails = (tier) => {
+    if (tier === 'VIP') return { color: 'from-indigo-500 to-purple-600', glow: 'rgba(99,102,241,0.15)' };
+    if (tier === 'General') return { color: 'from-cyan-500 to-blue-600', glow: 'rgba(6,182,212,0.15)' };
+    return { color: 'from-amber-500 to-orange-500', glow: 'rgba(245,158,11,0.15)' };
+  };
+
+  const theme = getThemeDetails(ticket.tier);
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return 'TBD';
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
   return (
     <div
       className="relative rounded-2xl overflow-hidden flex-shrink-0 w-72 cursor-pointer transition-all duration-300"
       style={{
         background: 'rgba(255,255,255,0.02)',
         border: '1px solid rgba(255,255,255,0.06)',
-        boxShadow: `0 10px 30px -10px ${ticket.accentLight}`,
+        boxShadow: `0 10px 30px -10px ${theme.glow}`,
       }}
       onMouseEnter={e => {
         e.currentTarget.style.transform = 'translateY(-4px)';
@@ -186,7 +197,7 @@ function TicketCard({ ticket }) {
       }}
     >
       {/* colour bar */}
-      <div className={`h-1 w-full bg-gradient-to-r ${ticket.color}`} />
+      <div className={`h-1 w-full bg-gradient-to-r ${theme.color}`} />
 
       <div className="p-5">
         {/* tier badge */}
@@ -197,17 +208,17 @@ function TicketCard({ ticket }) {
         </span>
 
         <h3 className="text-base font-bold text-white leading-tight mb-3 line-clamp-2">
-          {ticket.event}
+          {ticket.event?.name || 'Event Title'}
         </h3>
 
         <div className="space-y-1.5 text-xs text-slate-400">
           <div className="flex items-center gap-2">
             <CalendarDays size={12} className="text-slate-500" />
-            {ticket.date} · {ticket.time}
+            {formatDate(ticket.event?.date)}
           </div>
           <div className="flex items-center gap-2">
             <MapPin size={12} className="text-slate-500" />
-            {ticket.venue}
+            Exhibition Arena Hall A
           </div>
         </div>
 
@@ -236,18 +247,47 @@ function TicketCard({ ticket }) {
 /* ─── Main Dashboard ────────────────────────────────────── */
 export default function CustomerDashboard() {
   const navigate = useNavigate();
-  const [user] = useState(getUser);
+  const [user, setUser] = useState(getUser);
   const [showQr, setShowQr] = useState(false);
-  const [walletBalance] = useState(24_750);
+  const [walletBalance, setWalletBalance] = useState(24750);
   const [greeting, setGreeting] = useState('');
   const [notifCount] = useState(2);
+  const [tickets, setTickets] = useState([]);
 
   useEffect(() => {
     const h = new Date().getHours();
     if (h < 12) setGreeting('Good morning');
     else if (h < 17) setGreeting('Good afternoon');
     else setGreeting('Good evening');
-  }, []);
+
+    // Fetch user wallet state & tickets
+    if (user.id) {
+      const loadDashboardData = async () => {
+        try {
+          // Fetch updated wallet balance
+          const userRes = await fetch(`/api/auth/google-set-role`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.id, role: 'customer' })
+          });
+          if (userRes.ok) {
+            const userData = await userRes.json();
+            setWalletBalance(userData.user.walletBalance ?? 24750);
+          }
+
+          // Fetch real tickets
+          const ticketsRes = await fetch(`/api/events/user/${user.id}/tickets`);
+          const ticketsData = await ticketsRes.json();
+          if (ticketsData.success) {
+            setTickets(ticketsData.data);
+          }
+        } catch (err) {
+          console.error("Dashboard fetch error:", err);
+        }
+      };
+      loadDashboardData();
+    }
+  }, [user.id]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -363,7 +403,7 @@ export default function CustomerDashboard() {
               id: 'stat-tickets',
               icon: Ticket,
               label: 'Active Tickets',
-              value: MOCK_TICKETS.length,
+              value: tickets.length,
               suffix: '',
               color: '#6366f1',
             },
@@ -371,7 +411,7 @@ export default function CustomerDashboard() {
               id: 'stat-wallet',
               icon: Wallet,
               label: 'Wallet Balance',
-              value: 'LKR 24,750',
+              value: `LKR ${walletBalance.toLocaleString()}`,
               suffix: '',
               color: '#a855f7',
             },
@@ -379,7 +419,7 @@ export default function CustomerDashboard() {
               id: 'stat-upcoming',
               icon: CalendarDays,
               label: 'Upcoming Events',
-              value: 3,
+              value: tickets.length > 0 ? 1 : 0,
               suffix: ' this month',
               color: '#06b6d4',
             },
@@ -423,9 +463,13 @@ export default function CustomerDashboard() {
 
             {/* Horizontal scroll of ticket cards */}
             <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'thin' }}>
-              {MOCK_TICKETS.map(t => (
-                <TicketCard key={t.id} ticket={t} />
-              ))}
+              {tickets.length > 0 ? (
+                tickets.map(t => (
+                  <TicketCard key={t._id} ticket={t} />
+                ))
+              ) : (
+                <div className="text-slate-500 py-6 text-sm">No tickets purchased yet.</div>
+              )}
             </div>
           </div>
 
