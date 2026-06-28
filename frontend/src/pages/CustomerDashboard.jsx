@@ -164,28 +164,34 @@ function QrModal({ balance, onClose }) {
   );
 }
 
+// ... (kept for brevity, imports and helper functions remain same)
+
 /* ─── Ticket Card ───────────────────────────────────────── */
 function TicketCard({ ticket }) {
   return (
     <div
-      className="relative rounded-2xl overflow-hidden flex-shrink-0 w-72 cursor-pointer"
+      className="relative rounded-2xl overflow-hidden flex-shrink-0 w-72 cursor-pointer transition-all duration-300"
       style={{
-        background: 'linear-gradient(145deg, #0d1117 0%, #0a0e1a 100%)',
-        border: '1px solid rgba(255,255,255,0.07)',
-        boxShadow: `0 4px 24px ${ticket.accentLight}`,
-        transition: 'transform 0.25s cubic-bezier(0.16,1,0.3,1)',
+        background: 'rgba(255,255,255,0.02)',
+        border: '1px solid rgba(255,255,255,0.06)',
+        boxShadow: `0 10px 30px -10px ${ticket.accentLight}`,
       }}
-      onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-6px)')}
-      onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
+      onMouseEnter={e => {
+        e.currentTarget.style.transform = 'translateY(-4px)';
+        e.currentTarget.style.borderColor = 'rgba(99,102,241,0.2)';
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.transform = 'translateY(0)';
+        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
+      }}
     >
       {/* colour bar */}
-      <div className={`h-1.5 w-full bg-gradient-to-r ${ticket.color}`} />
+      <div className={`h-1 w-full bg-gradient-to-r ${ticket.color}`} />
 
       <div className="p-5">
         {/* tier badge */}
         <span
-          className={`inline-block text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full mb-3 bg-gradient-to-r ${ticket.color}`}
-          style={{ color: 'white' }}
+          className={`inline-block text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md mb-3 bg-white/5 border border-white/5 text-slate-300`}
         >
           {ticket.tier}
         </span>
@@ -209,7 +215,7 @@ function TicketCard({ ticket }) {
         <div
           className="my-4"
           style={{
-            borderTop: '1.5px dashed rgba(255,255,255,0.08)',
+            borderTop: '1px dashed rgba(255,255,255,0.08)',
           }}
         />
 
@@ -218,8 +224,8 @@ function TicketCard({ ticket }) {
             <p className="text-[10px] text-slate-500 uppercase tracking-wide">Seat</p>
             <p className="text-sm font-bold text-white">{ticket.seat}</p>
           </div>
-          <div className="p-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.05)' }}>
-            <QrCode size={18} className="text-slate-300" />
+          <div className="p-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.03)' }}>
+            <QrCode size={18} className="text-slate-400" />
           </div>
         </div>
       </div>
@@ -256,7 +262,7 @@ export default function CustomerDashboard() {
       className="min-h-screen"
       style={{
         background:
-          'radial-gradient(ellipse at 60% 0%, rgba(99,102,241,0.14) 0%, transparent 55%), radial-gradient(ellipse at 0% 80%, rgba(168,85,247,0.09) 0%, transparent 50%), #030712',
+          'radial-gradient(ellipse at 60% 0%, rgba(99,102,241,0.08) 0%, transparent 55%), radial-gradient(ellipse at 0% 80%, rgba(168,85,247,0.05) 0%, transparent 50%), #030712',
         fontFamily: "'Plus Jakarta Sans', sans-serif",
       }}
     >
@@ -264,16 +270,16 @@ export default function CustomerDashboard() {
 
       {/* ── Top Nav ── */}
       <header
-        className="sticky top-0 z-40"
+        className="sticky top-0 z-45"
         style={{
-          background: 'rgba(3,7,18,0.8)',
+          background: 'rgba(3,7,18,0.7)',
           backdropFilter: 'blur(20px)',
           borderBottom: '1px solid rgba(255,255,255,0.05)',
         }}
       >
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           {/* Logo */}
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => navigate('/')}>
             <div
               className="w-8 h-8 rounded-xl flex items-center justify-center"
               style={{ background: 'linear-gradient(135deg,#6366f1,#a855f7)' }}
@@ -287,8 +293,8 @@ export default function CustomerDashboard() {
           <div
             className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-slate-500 cursor-text flex-1 max-w-xs mx-8"
             style={{
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.07)',
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.06)',
             }}
             onClick={() => navigate('/events')}
           >
@@ -329,7 +335,7 @@ export default function CustomerDashboard() {
             <button
               id="logout-btn"
               onClick={handleLogout}
-              className="p-2 rounded-xl text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+              className="p-2 rounded-xl text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
               title="Logout"
             >
               <LogOut size={16} />
@@ -360,7 +366,6 @@ export default function CustomerDashboard() {
               value: MOCK_TICKETS.length,
               suffix: '',
               color: '#6366f1',
-              glow: 'rgba(99,102,241,0.2)',
             },
             {
               id: 'stat-wallet',
@@ -369,7 +374,6 @@ export default function CustomerDashboard() {
               value: 'LKR 24,750',
               suffix: '',
               color: '#a855f7',
-              glow: 'rgba(168,85,247,0.2)',
             },
             {
               id: 'stat-upcoming',
@@ -378,22 +382,16 @@ export default function CustomerDashboard() {
               value: 3,
               suffix: ' this month',
               color: '#06b6d4',
-              glow: 'rgba(6,182,212,0.2)',
             },
           ].map(stat => (
             <div
               key={stat.id}
               id={stat.id}
-              className="rounded-2xl p-5 flex items-center gap-4"
-              style={{
-                background: 'linear-gradient(145deg, #0d1117 0%, #0a0e1a 100%)',
-                border: '1px solid rgba(255,255,255,0.06)',
-                boxShadow: `0 4px 20px ${stat.glow}`,
-              }}
+              className="rounded-2xl p-5 flex items-center gap-4 border border-white/[0.04] bg-white/[0.01]"
             >
               <div
                 className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ background: `${stat.color}22` }}
+                style={{ background: 'rgba(255, 255, 255, 0.03)' }}
               >
                 <stat.icon size={20} style={{ color: stat.color }} />
               </div>
@@ -411,13 +409,13 @@ export default function CustomerDashboard() {
         {/* ── Tickets + Wallet Row ── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-          {/* Tickets panel — takes 2/3 */}
+          {/* Tickets panel ── takes 2/3 */}
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-white">My Tickets</h2>
               <button
                 id="view-all-tickets"
-                className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1"
+                className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1 cursor-pointer bg-transparent border-none font-semibold"
               >
                 View all <ChevronRight size={13} />
               </button>
@@ -431,14 +429,12 @@ export default function CustomerDashboard() {
             </div>
           </div>
 
-          {/* Wallet panel — takes 1/3 */}
+          {/* Wallet panel ── takes 1/3 */}
           <div
             id="wallet-panel"
-            className="rounded-2xl p-6 flex flex-col justify-between"
+            className="rounded-2xl p-6 flex flex-col justify-between border border-white/[0.04]"
             style={{
-              background: 'linear-gradient(145deg, #0f0d1f 0%, #0a0e1a 100%)',
-              border: '1px solid rgba(168,85,247,0.2)',
-              boxShadow: '0 4px 32px rgba(168,85,247,0.15)',
+              background: 'linear-gradient(145deg, rgba(255,255,255,0.01) 0%, rgba(255,255,255,0.002) 100%)',
               minHeight: 260,
             }}
           >
@@ -451,9 +447,9 @@ export default function CustomerDashboard() {
                 <span
                   className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full"
                   style={{
-                    background: 'rgba(168,85,247,0.15)',
+                    background: 'rgba(168,85,247,0.1)',
                     color: '#c084fc',
-                    border: '1px solid rgba(168,85,247,0.25)',
+                    border: '1px solid rgba(168,85,247,0.15)',
                   }}
                 >
                   Live
@@ -471,12 +467,11 @@ export default function CustomerDashboard() {
               <button
                 id="quick-pay-qr-btn"
                 onClick={() => setShowQr(true)}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm text-white transition-all duration-200"
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm text-white transition-all duration-200 cursor-pointer shadow-lg shadow-indigo-500/10"
                 style={{
-                  background: 'linear-gradient(135deg,#7c3aed,#a855f7)',
-                  boxShadow: '0 4px 16px rgba(168,85,247,0.35)',
+                  background: 'linear-gradient(135deg,#6366f1,#7c3aed)',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-2px)')}
+                onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-1px)')}
                 onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
               >
                 <QrCode size={16} />
@@ -485,12 +480,8 @@ export default function CustomerDashboard() {
 
               <button
                 id="top-up-btn"
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-medium text-sm text-slate-400 hover:text-white transition-colors"
-                style={{
-                  background: 'rgba(255,255,255,0.04)',
-                  border: '1px solid rgba(255,255,255,0.07)',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-2px)')}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-medium text-sm text-slate-300 hover:text-white transition-colors cursor-pointer bg-white/[0.02] border border-white/5 hover:bg-white/[0.04]"
+                onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-1px)')}
                 onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
               >
                 + Top Up Wallet
@@ -502,22 +493,9 @@ export default function CustomerDashboard() {
         {/* ── Browse Events CTA ── */}
         <div
           id="browse-events-cta"
-          className="rounded-2xl overflow-hidden relative cursor-pointer group"
-          style={{
-            background: 'linear-gradient(125deg, #1e1060 0%, #0d0825 40%, #0a0f1e 100%)',
-            border: '1px solid rgba(99,102,241,0.25)',
-          }}
+          className="rounded-2xl overflow-hidden relative cursor-pointer group border border-white/[0.04] bg-white/[0.01] hover:border-indigo-500/20 transition-all duration-300"
           onClick={() => navigate('/events')}
         >
-          {/* glow orb */}
-          <div
-            className="absolute -top-16 -right-16 w-64 h-64 rounded-full pointer-events-none"
-            style={{
-              background:
-                'radial-gradient(circle, rgba(99,102,241,0.25) 0%, transparent 70%)',
-            }}
-          />
-
           <div className="relative z-10 p-7 flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2 mb-2">
@@ -535,8 +513,7 @@ export default function CustomerDashboard() {
             </div>
 
             <div
-              className="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center ml-4 transition-all duration-200 group-hover:-translate-y-1"
-              style={{ background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.3)' }}
+              className="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center ml-4 transition-all duration-200 group-hover:-translate-y-1 bg-white/[0.02] border border-white/5"
             >
               <ChevronRight size={22} className="text-indigo-400" />
             </div>
@@ -547,10 +524,8 @@ export default function CustomerDashboard() {
         <div>
           <h2 className="text-lg font-bold text-white mb-4">Recent Activity</h2>
           <div
-            className="rounded-2xl divide-y"
+            className="rounded-2xl divide-y border border-white/[0.04] bg-white/[0.01]"
             style={{
-              background: 'linear-gradient(145deg,#0d1117,#0a0e1a)',
-              border: '1px solid rgba(255,255,255,0.06)',
               divideColor: 'rgba(255,255,255,0.05)',
             }}
           >
@@ -582,13 +557,13 @@ export default function CustomerDashboard() {
                 id={item.id}
                 className="flex items-center gap-4 px-5 py-4"
                 style={{
-                  borderColor: 'rgba(255,255,255,0.05)',
+                  borderColor: 'rgba(255,255,255,0.04)',
                   borderTopWidth: idx === 0 ? 0 : 1,
                 }}
               >
                 <div
                   className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{ background: `${item.color}22` }}
+                  style={{ background: 'rgba(255, 255, 255, 0.03)' }}
                 >
                   <item.icon size={14} style={{ color: item.color }} />
                 </div>
