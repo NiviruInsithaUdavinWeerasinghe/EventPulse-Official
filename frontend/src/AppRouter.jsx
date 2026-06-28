@@ -14,6 +14,8 @@ import CustomerList from './pages/CustomerList.jsx';
 import ProfileUpdateForm from './components/ProfileUpdateForm.jsx';
 // US-105-SUB-12: full customer portal home
 import CustomerDashboard from './pages/CustomerDashboard.jsx';
+import EventDetails from './pages/EventDetails.jsx';
+import Checkout from './pages/Checkout.jsx';
 
 // ─── Helper: decode JWT role from localStorage ──────────────────────────────
 function getRoleFromToken() {
@@ -98,7 +100,7 @@ export default function AppRouter() {
   const getPageKey = () => {
     const path = location.pathname;
     if (path === '/') return 'landing';
-    if (path === '/events') return 'events';
+    if (path.startsWith('/events')) return 'events';
     if (path === '/create-event') return 'create-event';
     if (path.startsWith('/map-viewer')) return 'map-viewer';
     return '';
@@ -115,6 +117,16 @@ export default function AppRouter() {
 
       {/* Organizer routes (EP-76) */}
       <Route path="/organizer/dashboard" element={
+        <ProtectedRoute allowedRoles={['organizer']}>
+          <OrganizerDashboard />
+        </ProtectedRoute>
+      } />
+      <Route path="/organizer/dashboard/:tab" element={
+        <ProtectedRoute allowedRoles={['organizer']}>
+          <OrganizerDashboard />
+        </ProtectedRoute>
+      } />
+      <Route path="/organizer/dashboard/edit-event/:eventId" element={
         <ProtectedRoute allowedRoles={['organizer']}>
           <OrganizerDashboard />
         </ProtectedRoute>
@@ -153,10 +165,24 @@ export default function AppRouter() {
         </MainLayout>
       } />
 
-      <Route path="/events" element={
+      <Route path="/events" exact element={
         <MainLayout currentPage={getPageKey()} onNavigate={handleNavigate}>
           <EventsPage onNavigate={handleNavigate} />
         </MainLayout>
+      } />
+
+      <Route path="/events/:id" exact element={
+        <MainLayout currentPage={getPageKey()} onNavigate={handleNavigate}>
+          <EventDetails />
+        </MainLayout>
+      } />
+
+      <Route path="/events/:id/checkout" exact element={
+        <ProtectedRoute allowedRoles={['customer']}>
+          <MainLayout currentPage={getPageKey()} onNavigate={handleNavigate}>
+            <Checkout />
+          </MainLayout>
+        </ProtectedRoute>
       } />
 
       <Route path="/create-event" element={

@@ -49,26 +49,54 @@ export default function Navbar({ currentPage, onNavigate }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Define theme colors based on role
+  const getRoleTheme = () => {
+    if (role === 'organizer') {
+      return {
+        headerBorder: 'border-zinc-800 bg-[#090a0f]/80',
+        logoText: 'text-white',
+        logoFill: '#6366f1',
+        buttonBg: 'bg-indigo-600 hover:bg-indigo-700 text-white'
+      };
+    }
+    if (role === 'vendor') {
+      return {
+        headerBorder: 'border-amber-500/10 bg-amber-950/20',
+        logoText: 'text-amber-100',
+        logoFill: '#f59e0b',
+        buttonBg: 'bg-amber-600 hover:bg-amber-700 text-white'
+      };
+    }
+    // Default Customer / Guest
+    return {
+      headerBorder: 'border-white/5 bg-[#030712]/70',
+      logoText: 'text-white',
+      logoFill: '#818cf8',
+      buttonBg: 'bg-white/[0.03] border-white/10 text-slate-50 hover:bg-white/[0.08] hover:border-white/20'
+    };
+  };
+
+  const theme = getRoleTheme();
   const firstLetter = user && user.fullName ? user.fullName[0].toUpperCase() : 'U';
 
   return (
-    <header className="flex justify-between items-center py-6 border-b border-white/5 relative z-50">
+    <header className={`flex justify-between items-center py-6 px-6 md:px-12 border-b backdrop-blur-md sticky top-0 z-40 transition-colors duration-300 ${theme.headerBorder}`}>
       {/* Logo */}
       <div
-        className="flex items-center gap-2 cursor-pointer gradient-text-brand text-2xl font-extrabold"
+        className={`flex items-center gap-2.5 cursor-pointer text-2xl font-extrabold tracking-tight ${theme.logoText}`}
         onClick={() => onNavigate('landing')}
       >
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="url(#logoGrad)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          <path d="M2 17L12 22L22 17" stroke="url(#logoGrad)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          <path d="M2 12L12 17L22 12" stroke="url(#logoGrad)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          <defs>
-            <linearGradient id="logoGrad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-              <stop stopColor="#818cf8"/><stop offset="1" stopColor="#c084fc"/>
-            </linearGradient>
-          </defs>
-        </svg>
-        EventPulse
+        <div 
+          className="w-8 h-8 rounded-xl flex items-center justify-center shadow-md shadow-indigo-500/10"
+          style={{ background: theme.logoFill }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5z" />
+            <path d="M2 17l10 5 10-5" />
+            <path d="M2 12l10 5 10-5" />
+          </svg>
+        </div>
+        <span>EventPulse</span>
       </div>
 
       {/* Nav links */}
@@ -76,7 +104,7 @@ export default function Navbar({ currentPage, onNavigate }) {
         <a
           href="#"
           onClick={(e) => { e.preventDefault(); onNavigate('landing'); }}
-          className={`text-sm font-medium transition-colors duration-200 no-underline ${
+          className={`text-sm font-semibold transition-colors duration-200 no-underline ${
             currentPage === 'landing' ? 'text-slate-50' : 'text-slate-400 hover:text-slate-50'
           }`}
         >
@@ -85,12 +113,36 @@ export default function Navbar({ currentPage, onNavigate }) {
         <a
           href="#"
           onClick={(e) => { e.preventDefault(); onNavigate('events'); }}
-          className={`text-sm font-medium transition-colors duration-200 no-underline ${
+          className={`text-sm font-semibold transition-colors duration-200 no-underline ${
             currentPage === 'events' ? 'text-slate-50' : 'text-slate-400 hover:text-slate-50'
           }`}
         >
           Events
         </a>
+        {role === 'customer' && (
+          <Link
+            to="/customer/dashboard"
+            className="text-sm font-semibold text-slate-400 hover:text-slate-50 transition-colors duration-200 no-underline"
+          >
+            My Wallet
+          </Link>
+        )}
+        {role === 'vendor' && (
+          <Link
+            to="/vendor/portal"
+            className="text-sm font-semibold text-slate-400 hover:text-slate-50 transition-colors duration-200 no-underline"
+          >
+            Portal
+          </Link>
+        )}
+        {role === 'organizer' && (
+          <Link
+            to="/organizer/dashboard"
+            className="text-sm font-semibold text-slate-400 hover:text-slate-50 transition-colors duration-200 no-underline"
+          >
+            Console
+          </Link>
+        )}
         {role ? (
           <div className="relative" ref={dropdownRef}>
             <button
@@ -107,7 +159,7 @@ export default function Navbar({ currentPage, onNavigate }) {
             </button>
 
             {dropdownOpen && (
-              <div className="absolute right-0 mt-2.5 w-60 rounded-2xl border border-white/10 bg-[#0b0f19] p-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)] backdrop-blur-xl animate-fade-in z-50">
+              <div className="absolute right-0 mt-2.5 window-dropdown w-60 rounded-2xl border border-white/10 bg-[#0b0f19] p-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)] backdrop-blur-xl animate-fade-in z-50">
                 <div className="border-b border-white/5 pb-3 mb-3">
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Logged in as</p>
                   <p className="text-sm font-bold text-white truncate">{user?.fullName || 'User'}</p>
@@ -140,7 +192,7 @@ export default function Navbar({ currentPage, onNavigate }) {
         ) : (
           <Link
             to="/login"
-            className="text-sm font-medium text-slate-400 hover:text-slate-50 transition-colors duration-200 no-underline"
+            className="text-sm font-semibold text-slate-400 hover:text-slate-50 transition-colors duration-200 no-underline"
           >
             Login
           </Link>
@@ -148,12 +200,8 @@ export default function Navbar({ currentPage, onNavigate }) {
         {role === 'organizer' && (
           <button
             id="create-event-nav-btn"
-            onClick={() => onNavigate('create-event')}
-            className={`px-5 py-2.5 text-sm font-semibold rounded-lg border transition-all duration-200 cursor-pointer font-[inherit] ${
-              currentPage === 'create-event'
-                ? 'bg-indigo-500/10 border-indigo-500/40 text-indigo-300'
-                : 'bg-white/[0.03] border-white/10 text-slate-50 hover:bg-white/[0.08] hover:border-white/20'
-            }`}
+            onClick={() => navigate('/organizer/dashboard/create-event')}
+            className={`px-5 py-2.5 text-sm font-semibold rounded-lg border transition-all duration-200 cursor-pointer font-[inherit] ${theme.buttonBg}`}
           >
             Create Event
           </button>
