@@ -121,6 +121,16 @@ export default function AppRouter() {
           <OrganizerDashboard />
         </ProtectedRoute>
       } />
+      <Route path="/organizer/dashboard/:tab" element={
+        <ProtectedRoute allowedRoles={['organizer']}>
+          <OrganizerDashboard />
+        </ProtectedRoute>
+      } />
+      <Route path="/organizer/dashboard/edit-event/:eventId" element={
+        <ProtectedRoute allowedRoles={['organizer']}>
+          <OrganizerDashboard />
+        </ProtectedRoute>
+      } />
 
       {/* Vendor routes (EP-76) */}
       <Route path="/vendor/portal" element={

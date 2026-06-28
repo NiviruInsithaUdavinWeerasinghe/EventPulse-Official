@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Upload, 
   Map, 
@@ -12,43 +12,44 @@ import {
   ArrowRight,
   Maximize2
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export default function BlueprintUploads() {
-  const [blueprints, setBlueprints] = useState([
-    {
-      id: "MAP-401",
-      name: "Main Hall A - Tech Summit Layout",
-      event: "Global Tech Summit 2026",
-      dimensions: "2400 x 1800 px",
-      fileSize: "4.8 MB",
-      format: "SVG",
-      stallsMapped: 48,
-      status: "Verified",
-      uploadDate: "June 25, 2026, 04:32 PM",
-    },
-    {
-      id: "MAP-402",
-      name: "Pavilion 4 Food Stalls Layout",
-      event: "National Food & Wine Expo",
-      dimensions: "3200 x 2400 px",
-      fileSize: "8.2 MB",
-      format: "PNG",
-      stallsMapped: 80,
-      status: "Verified",
-      uploadDate: "June 24, 2026, 11:15 AM",
-    },
-    {
-      id: "MAP-403",
-      name: "Open Plaza Gardens - Craft Area",
-      event: "Art & Craft Festival Autumn",
-      dimensions: "1600 x 1200 px",
-      fileSize: "2.1 MB",
-      format: "SVG",
-      stallsMapped: 30,
-      status: "Draft",
-      uploadDate: "June 20, 2026, 09:44 AM",
-    },
-  ]);
+  const [blueprints, setBlueprints] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchBlueprints = async () => {
+      try {
+        const res = await fetch('/api/events');
+        const data = await res.json();
+        if (data.success) {
+          // Map events that contain floorMap images to our blueprint format
+          const mapped = data.data
+            .filter(e => e.floorMapImageUrl)
+            .map(e => ({
+              id: `MAP-${e._id.substring(18)}`,
+              name: `${e.name} Layout Blueprint`,
+              event: e.name,
+              eventId: e._id,
+              dimensions: "Vector Scale",
+              fileSize: "N/A",
+              format: "SVG/Image",
+              stallsMapped: 30,
+              status: "Verified",
+              uploadDate: e.createdAt ? new Date(e.createdAt).toLocaleDateString() : "Just now",
+            }));
+          setBlueprints(mapped);
+        }
+      } catch (err) {
+        console.error("Blueprint fetch error:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchBlueprints();
+  }, []);
 
   const [dragActive, setDragActive] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -223,6 +224,7 @@ export default function BlueprintUploads() {
 
                 <div className="flex gap-2 justify-end mt-5 pt-3 border-t border-slate-100 dark:border-zinc-800">
                   <button 
+                    onClick={() => navigate(`/map-viewer/${bp.eventId}`)}
                     title="Open layout mapper editor"
                     className="flex-1 inline-flex items-center justify-center gap-1.5 bg-slate-50 hover:bg-slate-100 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-slate-200 dark:border-zinc-800 text-slate-800 dark:text-slate-200 font-bold text-[11px] py-2 rounded-lg cursor-pointer transition-all"
                   >
@@ -287,6 +289,12 @@ export default function BlueprintUploads() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="text-center pt-8 pb-4">
+        <p className="text-orange-500 font-extrabold text-2xl tracking-wide uppercase animate-pulse">
+          will give a purpose for this section later
+        </p>
       </div>
 
     </div>

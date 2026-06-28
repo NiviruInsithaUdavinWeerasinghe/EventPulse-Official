@@ -93,6 +93,48 @@ export const getEventById = async (req, res) => {
   }
 };
 
+// PUT /api/events/:id
+export const updateEvent = async (req, res) => {
+  try {
+    const { name, description, date } = req.body;
+    const event = await Event.findById(req.params.id);
+    if (!event) {
+      return res.status(404).json({ success: false, message: 'Event not found.' });
+    }
+
+    if (name) event.name = name;
+    if (description !== undefined) event.description = description;
+    if (date !== undefined) event.date = date ? new Date(date) : null;
+
+    const bannerFile = req.files?.banner?.[0];
+    const floorMapFile = req.files?.floorMap?.[0];
+
+    const uploads = [];
+    if (bannerFile) {
+      uploads.push(streamUpload(bannerFile.buffer, 'eventpulse/banners').then(res => {
+        event.bannerImageUrl = res.secure_url;
+        event.bannerPublicId = res.public_id;
+      }));
+    }
+    if (floorMapFile) {
+      uploads.push(streamUpload(floorMapFile.buffer, 'eventpulse/floormaps').then(res => {
+        event.floorMapImageUrl = res.secure_url;
+        event.floorMapPublicId = res.public_id;
+      }));
+    }
+
+    if (uploads.length > 0) {
+      await Promise.all(uploads);
+    }
+
+    await event.save();
+    res.status(200).json({ success: true, data: event });
+  } catch (error) {
+    console.error('Update event error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 import Ticket from '../models/Ticket.js';
 import User from '../models/User.js';
 

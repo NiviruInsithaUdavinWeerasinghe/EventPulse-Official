@@ -335,6 +335,13 @@ export default function VendorApprovals() {
         </div>
       )}
 
+      {/* Description tag statement */}
+      <div className="text-center pt-8 pb-4">
+        <p className="text-orange-500 font-extrabold text-2xl tracking-wide uppercase animate-pulse">
+          for the vendor accounts to be verified when they're registering for an event created by the organizer
+        </p>
+      </div>
+
     </div>
   );
 }
