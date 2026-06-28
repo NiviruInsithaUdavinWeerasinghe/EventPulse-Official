@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, useNavigate as useRouteNavigator } from 'react-router-dom';
 import Navbar from './components/Navbar.jsx';
 import App from './App.jsx';
 import EventsPage from './pages/EventsPage.jsx';
@@ -16,15 +16,14 @@ import ProfileUpdateForm from './components/ProfileUpdateForm.jsx';
 import CustomerDashboard from './pages/CustomerDashboard.jsx';
 
 // ─── Helper: decode JWT role from localStorage ──────────────────────────────
-// (from EP-76 — JWT-based, includes expiry check)
 function getRoleFromToken() {
   try {
     const token = localStorage.getItem('token');
     if (!token) return null;
     const payload = JSON.parse(atob(token.split('.')[1]));
-    // Check token hasn't expired
     if (payload.exp && payload.exp * 1000 < Date.now()) {
       localStorage.removeItem('token');
+      localStorage.removeItem('user');
       return null;
     }
     return payload.role || null;
@@ -34,14 +33,12 @@ function getRoleFromToken() {
 }
 
 // ─── Protected Route: redirects to /login if not authenticated ──────────────
-// Smart: if authenticated but wrong role, redirects to their own dashboard
 function ProtectedRoute({ children, allowedRoles }) {
   const role = getRoleFromToken();
 
   if (!role) return <Navigate to="/login" replace />;
 
   if (allowedRoles && !allowedRoles.includes(role)) {
-    // Redirect to their correct dashboard rather than just /login
     if (role === 'organizer') return <Navigate to="/organizer/dashboard" replace />;
     if (role === 'vendor')    return <Navigate to="/vendor/portal" replace />;
     return <Navigate to="/customer/dashboard" replace />;
@@ -51,7 +48,6 @@ function ProtectedRoute({ children, allowedRoles }) {
 }
 
 // ─── Role-based redirect after login ────────────────────────────────────────
-// Customers now go to the full portal dashboard (US-105-SUB-12)
 function RoleRedirect() {
   const role = getRoleFromToken();
   if (!role)                  return <Navigate to="/login" replace />;
@@ -69,52 +65,47 @@ function AuthLayout({ children }) {
   );
 }
 
-// ─── Main app with state-based page router ───────────────────────────────────
-function MainApp() {
-  const [currentPage, setCurrentPage] = useState('landing');
-  const [selectedEventId, setSelectedEventId] = useState(null);
-
-  const navigate = (page, eventId = null) => {
-    setCurrentPage(page);
-    if (eventId) setSelectedEventId(eventId);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const isMapViewer = currentPage === 'map-viewer';
-
-  const renderPage = () => {
-    switch (currentPage) {
-      case 'events':
-        return <EventsPage onNavigate={navigate} />;
-      case 'create-event':
-        return <CreateEvent onNavigate={navigate} />;
-      case 'map-viewer':
-        return <MapViewer eventId={selectedEventId} onNavigate={navigate} />;
-      default:
-        return <App onNavigate={navigate} />;
-    }
-  };
-
+// ─── Layout wrapper with Navbar ─────────────────────────────────────────────
+function MainLayout({ children, currentPage, onNavigate }) {
   return (
     <div>
-      {!isMapViewer && (
-        <div className="max-w-[1200px] mx-auto px-6">
-          <Navbar currentPage={currentPage} onNavigate={navigate} />
-        </div>
-      )}
-      {isMapViewer
-        ? <MapViewer eventId={selectedEventId} onNavigate={navigate} />
-        : renderPage()
-      }
+      <div className="max-w-[1200px] mx-auto px-6">
+        <Navbar currentPage={currentPage} onNavigate={onNavigate} />
+      </div>
+      {children}
     </div>
   );
 }
 
 // ─── Main Router ─────────────────────────────────────────────────────────────
 export default function AppRouter() {
+  const navigate = useRouteNavigator();
+  const location = useLocation();
+
+  const handleNavigate = (page, eventId = null) => {
+    if (page === 'landing') {
+      navigate('/');
+    } else if (page === 'events') {
+      navigate('/events');
+    } else if (page === 'create-event') {
+      navigate('/create-event');
+    } else if (page === 'map-viewer' && eventId) {
+      navigate(`/map-viewer/${eventId}`);
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const getPageKey = () => {
+    const path = location.pathname;
+    if (path === '/') return 'landing';
+    if (path === '/events') return 'events';
+    if (path === '/create-event') return 'create-event';
+    if (path.startsWith('/map-viewer')) return 'map-viewer';
+    return '';
+  };
+
   return (
     <Routes>
-
       {/* Auth pages */}
       <Route path="/login"    element={<AuthLayout><Login /></AuthLayout>} />
       <Route path="/register" element={<AuthLayout><Register /></AuthLayout>} />
@@ -137,13 +128,11 @@ export default function AppRouter() {
       } />
 
       {/* Customer routes */}
-      {/* US-105-SUB-12: Full customer portal home (wallet, tickets, QR) */}
       <Route path="/customer/dashboard" element={
         <ProtectedRoute allowedRoles={['customer']}>
           <CustomerDashboard />
         </ProtectedRoute>
       } />
-      {/* EP-76: Legacy customer list page kept as secondary route */}
       <Route path="/customer/list" element={
         <ProtectedRoute allowedRoles={['customer']}>
           <CustomerList />
@@ -157,9 +146,39 @@ export default function AppRouter() {
         </ProtectedRoute>
       } />
 
-      {/* All landing/event pages */}
-      <Route path="/*" element={<MainApp />} />
+      {/* Main Pages with Navbar and clean routing URL structures */}
+      <Route path="/" element={
+        <MainLayout currentPage={getPageKey()} onNavigate={handleNavigate}>
+          <App onNavigate={handleNavigate} />
+        </MainLayout>
+      } />
 
+      <Route path="/events" element={
+        <MainLayout currentPage={getPageKey()} onNavigate={handleNavigate}>
+          <EventsPage onNavigate={handleNavigate} />
+        </MainLayout>
+      } />
+
+      <Route path="/create-event" element={
+        <ProtectedRoute allowedRoles={['organizer']}>
+          <MainLayout currentPage={getPageKey()} onNavigate={handleNavigate}>
+            <CreateEvent onNavigate={handleNavigate} />
+          </MainLayout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/map-viewer/:eventId" element={
+        <MapViewerWrapper onNavigate={handleNavigate} />
+      } />
+
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
+}
+
+// Wrapper for MapViewer to parse params correctly
+import { useParams } from 'react-router-dom';
+function MapViewerWrapper({ onNavigate }) {
+  const { eventId } = useParams();
+  return <MapViewer eventId={eventId} onNavigate={onNavigate} />;
 }
