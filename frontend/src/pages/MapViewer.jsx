@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import StallDetailModal from '../components/StallDetailModal.jsx';
 
 const API_BASE = '/api';
 
@@ -6,6 +7,43 @@ export default function MapViewer({ eventId, onNavigate }) {
   const [event, setEvent] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // ── EP-43: demo modal state (temporary trigger until hall-block clicks are wired up) ──
+  const [isStallModalOpen, setIsStallModalOpen] = useState(false);
+  const [selectedStall, setSelectedStall] = useState(null);
+
+  const getUserRole = () => {
+    try {
+      return JSON.parse(localStorage.getItem('user'))?.role || 'customer';
+    } catch {
+      return 'customer';
+    }
+  };
+
+  const demoStalls = [
+    {
+      officialName: 'A-12 — Spark Electronics',
+      scheduledTheme: 'Tech & Gadgets Zone · Hall A',
+      description: 'Showcasing the latest in consumer electronics, smart home devices, and accessories at exclusive show-day pricing.',
+      tags: ['Electronics', 'Smart Home', 'Accessories'],
+      isVacant: false,
+    },
+    {
+      officialName: 'B-07 — Vacant Stall',
+      scheduledTheme: 'Food & Beverage Zone · Hall B',
+      isVacant: true,
+    },
+  ];
+
+  const openStallModal = (stall) => {
+    setSelectedStall(stall);
+    setIsStallModalOpen(true);
+  };
+
+  const handleRequestBooking = () => {
+    alert(`Booking request sent for ${selectedStall.officialName}!`);
+    setIsStallModalOpen(false);
+  };
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -119,20 +157,37 @@ export default function MapViewer({ eventId, onNavigate }) {
 
           <div className="h-px bg-white/5 my-1" />
 
+          {/* ── EP-43 demo: tap to preview the stall modal ── */}
           <div className="flex flex-col gap-2">
-            {[['🏪','Stall Manager'],['📍','Zone Labels'],['🔥','Congestion Heat Map'],['🧭','Routing']].map(([icon, label]) => (
-              <div key={label} className="flex items-center gap-3 px-4 py-3 bg-white/[0.02] border border-white/[0.04] rounded-xl text-slate-700 text-sm font-medium cursor-default">
-                <span className="text-lg opacity-40">{icon}</span>
-                <span>{label}</span>
-              </div>
+            <p className="text-[0.7rem] font-semibold text-slate-600 uppercase tracking-widest m-0 mb-1">
+              EP-43 Demo — Tap a Stall
+            </p>
+            {demoStalls.map((stall) => (
+              <button
+                key={stall.officialName}
+                onClick={() => openStallModal(stall)}
+                className="flex items-center gap-3 px-4 py-3 bg-white/[0.02] border border-white/[0.06] rounded-xl text-slate-300 text-sm font-medium hover:bg-white/[0.05] hover:border-indigo-500/30 transition-colors text-left"
+              >
+                <span className="text-lg">{stall.isVacant ? '🟢' : '🏪'}</span>
+                <span>{stall.officialName}</span>
+              </button>
             ))}
           </div>
 
           <p className="text-[0.75rem] text-slate-800 leading-relaxed m-0 text-center">
-            Interactive controls will be implemented in upcoming sprints.
+            Full interactive hall-block tapping coming in a future sprint.
           </p>
         </aside>
       </div>
+
+      {/* ── EP-43: Stall Detail Modal ── */}
+      <StallDetailModal
+        isOpen={isStallModalOpen}
+        onClose={() => setIsStallModalOpen(false)}
+        stall={selectedStall}
+        userRole={getUserRole()}
+        onRequestBooking={handleRequestBooking}
+      />
     </div>
   );
 }
