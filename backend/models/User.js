@@ -6,6 +6,8 @@ const userSchema = new mongoose.Schema({
   email:    { type: String, required: true, unique: true, lowercase: true, trim: true },
   phone:    { type: String, required: true, trim: true },
   password: { type: String, required: true },
+  role:     { type: String, enum: ['organizer', 'vendor', 'customer'], default: 'customer' },
+  walletBalance: { type: Number, default: 24750 } // Defaults to original mockup balance
 }, { timestamps: true });
 
 userSchema.pre('save', async function (next) {

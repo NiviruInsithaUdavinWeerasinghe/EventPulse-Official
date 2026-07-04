@@ -53,23 +53,23 @@ export default function Navbar({ currentPage, onNavigate }) {
   const getRoleTheme = () => {
     if (role === 'organizer') {
       return {
-        headerBorder: 'border-zinc-800/80 bg-zinc-950/80',
+        headerBorder: 'border-zinc-800 bg-[#090a0f]/80',
         logoText: 'text-white',
         logoFill: '#6366f1',
-        buttonBg: 'bg-indigo-650 hover:bg-indigo-700 text-white border-transparent'
+        buttonBg: 'bg-indigo-600 hover:bg-indigo-700 text-white'
       };
     }
     if (role === 'vendor') {
       return {
-        headerBorder: 'border-amber-500/10 bg-[#090a0f]/90',
+        headerBorder: 'border-amber-500/10 bg-amber-950/20',
         logoText: 'text-amber-100',
         logoFill: '#f59e0b',
-        buttonBg: 'bg-amber-600 hover:bg-amber-700 text-white border-transparent'
+        buttonBg: 'bg-amber-600 hover:bg-amber-700 text-white'
       };
     }
-    // Default Customer / Guest / Main layouts
+    // Default Customer / Guest
     return {
-      headerBorder: 'border-white/5 bg-[#030712]/90',
+      headerBorder: 'border-white/5 bg-[#030712]/70',
       logoText: 'text-white',
       logoFill: '#818cf8',
       buttonBg: 'bg-white/[0.03] border-white/10 text-slate-50 hover:bg-white/[0.08] hover:border-white/20'
@@ -80,7 +80,7 @@ export default function Navbar({ currentPage, onNavigate }) {
   const firstLetter = user && user.fullName ? user.fullName[0].toUpperCase() : 'U';
 
   return (
-    <header className={`flex justify-between items-center py-5 px-6 md:px-12 border-b backdrop-blur-md sticky top-0 z-40 transition-all duration-350 shadow-sm ${theme.headerBorder}`}>
+    <header className={`flex justify-between items-center py-6 px-6 md:px-12 border-b backdrop-blur-md sticky top-0 z-40 transition-colors duration-300 ${theme.headerBorder}`}>
       {/* Logo */}
       <div
         className={`flex items-center gap-2.5 cursor-pointer text-2xl font-extrabold tracking-tight ${theme.logoText}`}

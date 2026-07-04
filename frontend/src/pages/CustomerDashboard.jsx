@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Navbar from '../components/Navbar.jsx';
 import {
   Ticket,
   Wallet,
@@ -309,11 +308,81 @@ export default function CustomerDashboard() {
     >
       {showQr && <QrModal balance={walletBalance} onClose={() => setShowQr(false)} />}
 
-      {/* Unified Global Navbar */}
-      <Navbar currentPage="customer-dashboard" onNavigate={(page) => {
-        if (page === 'landing') navigate('/');
-        else if (page === 'events') navigate('/events');
-      }} />
+      {/* ── Top Nav ── */}
+      <header
+        className="sticky top-0 z-45"
+        style={{
+          background: 'rgba(3,7,18,0.7)',
+          backdropFilter: 'blur(20px)',
+          borderBottom: '1px solid rgba(255,255,255,0.05)',
+        }}
+      >
+        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+          {/* Logo */}
+          <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => navigate('/')}>
+            <div
+              className="w-8 h-8 rounded-xl flex items-center justify-center"
+              style={{ background: 'linear-gradient(135deg,#6366f1,#a855f7)' }}
+            >
+              <Sparkles size={15} className="text-white" />
+            </div>
+            <span className="font-bold text-white text-sm tracking-tight">EventPulse</span>
+          </div>
+
+          {/* Search bar */}
+          <div
+            className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-slate-500 cursor-text flex-1 max-w-xs mx-8"
+            style={{
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.06)',
+            }}
+            onClick={() => navigate('/events')}
+          >
+            <Search size={14} />
+            <span>Search events…</span>
+          </div>
+
+          {/* Right side */}
+          <div className="flex items-center gap-3">
+            <button
+              id="notif-btn"
+              className="relative p-2 rounded-xl transition-colors hover:bg-white/5"
+            >
+              <Bell size={18} className="text-slate-400" />
+              {notifCount > 0 && (
+                <span
+                  className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center text-white"
+                  style={{ background: 'linear-gradient(135deg,#6366f1,#a855f7)' }}
+                >
+                  {notifCount}
+                </span>
+              )}
+            </button>
+
+            {/* Avatar */}
+            <div className="flex items-center gap-2">
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white"
+                style={{ background: 'linear-gradient(135deg,#6366f1,#a855f7)' }}
+              >
+                {firstName[0]?.toUpperCase()}
+              </div>
+              <span className="hidden sm:block text-sm font-medium text-slate-300">
+                {firstName}
+              </span>
+            </div>
+
+            <button
+              id="logout-btn"
+              onClick={handleLogout}
+              className="p-2 rounded-xl text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+              title="Logout"
+            >
+              <LogOut size={16} />
+            </button>
+          </div>
+        </div>
+      </header>
 
       {/* ── Main ── */}
       <main className="max-w-6xl mx-auto px-6 py-10 space-y-10">

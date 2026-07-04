@@ -20,7 +20,6 @@ import {
   User
 } from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle.jsx';
-import Navbar from '../components/Navbar.jsx';
 
 // Import sub-pages components
 import MainDashboard from '../components/organizer/MainDashboard.jsx';
@@ -307,11 +306,147 @@ export default function OrganizerDashboard() {
       {/* ── Main Content Area Layout ────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0">
         
-        {/* Unified Global Navigation Header */}
-        <Navbar currentPage={`organizer-${activeTab}`} onNavigate={(page) => {
-          if (page === 'landing') navigate('/');
-          else if (page === 'events') navigate('/events');
-        }} />
+        {/* Sticky Header */}
+        <header className="sticky top-0 z-30 backdrop-blur-md bg-slate-50/80 dark:bg-[#090a0f]/80 border-b border-slate-200/50 dark:border-zinc-900/80 px-4 md:px-8 py-4 flex items-center justify-between gap-4">
+          
+          <div className="flex items-center gap-3">
+            {/* Mobile Hamburger menu */}
+            <button 
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="lg:hidden p-2 text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-900 rounded-xl cursor-pointer"
+            >
+              <Menu size={20} />
+            </button>
+            
+            <div>
+              <h2 className="text-sm md:text-base font-extrabold text-slate-900 dark:text-white leading-none">
+                {activeTabName}
+              </h2>
+              <span className="hidden md:inline-block text-[10px] font-semibold text-slate-400 mt-1">
+                {formattedDate}
+              </span>
+            </div>
+          </div>
+
+          {/* Search Box & Utilities */}
+          <div className="flex items-center gap-4">
+            
+            {/* Search Box - Only visible on tabs with search requirements */}
+            {['dashboard', 'events', 'approvals', 'settlements'].includes(activeTab) && (
+              <div className="relative hidden sm:block max-w-xs w-48 xl:w-64">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input 
+                  type="text"
+                  placeholder="Global search..."
+                  className="w-full pl-8.5 pr-4 py-2 bg-slate-100 dark:bg-zinc-950 border border-slate-200/50 dark:border-zinc-900/80 rounded-xl text-xs font-semibold focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                />
+              </div>
+            )}
+
+            {/* Theme Toggle Wrapper */}
+            <ThemeToggle 
+              isDarkMode={isDarkMode} 
+              toggleDarkMode={() => setIsDarkMode(!isDarkMode)} 
+            />
+
+            {/* Notifications Alert Dropdown */}
+            <div className="relative">
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsNotificationsOpen(!isNotificationsOpen);
+                  setIsProfileOpen(false);
+                }}
+                className="p-2.5 rounded-full bg-slate-100 dark:bg-zinc-900 hover:bg-slate-200 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300 transition-colors cursor-pointer relative"
+              >
+                <Bell size={16} />
+                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-rose-500" />
+              </button>
+
+              {/* Notification Drawer */}
+              {isNotificationsOpen && (
+                <div 
+                  className="absolute right-0 mt-3 w-80 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xl py-3 z-50 animate-fade-in"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="px-4 py-2 border-b border-slate-100 dark:border-zinc-800 flex justify-between items-center">
+                    <span className="text-xs font-extrabold text-slate-900 dark:text-white">Workspace Alerts</span>
+                    <button className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold hover:underline cursor-pointer">Mark all read</button>
+                  </div>
+                  <div className="divide-y divide-slate-50 dark:divide-zinc-850 max-h-64 overflow-y-auto">
+                    {alerts.map((al) => (
+                      <div key={al.id} className="p-3.5 hover:bg-slate-50/50 dark:hover:bg-zinc-850/50 text-xs">
+                        <div className="flex justify-between items-start gap-2">
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${al.read ? 'bg-slate-350' : 'bg-indigo-650'}`} />
+                          <p className="flex-1 text-slate-650 dark:text-slate-300 leading-normal">{al.msg}</p>
+                        </div>
+                        <span className="text-[10px] text-slate-400 block mt-1.5 pl-3">{al.time}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Profile Dropdown */}
+            <div className="relative">
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsProfileOpen(!isProfileOpen);
+                  setIsNotificationsOpen(false);
+                }}
+                className="flex items-center gap-1.5 p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-900 cursor-pointer transition-colors"
+              >
+                <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white font-extrabold flex items-center justify-center text-xs">
+                  {initials}
+                </div>
+                <ChevronDown size={14} className="text-slate-400" />
+              </button>
+
+              {/* Profile Context Options */}
+              {isProfileOpen && (
+                <div 
+                  className="absolute right-0 mt-3 w-56 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xl py-2.5 z-50 animate-fade-in text-xs font-semibold"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="px-4 py-2 border-b border-slate-100 dark:border-zinc-850">
+                    <p className="text-slate-900 dark:text-white font-extrabold">{profileUser.fullName}</p>
+                    <p className="text-[10px] text-slate-500 font-normal mt-0.5">{profileUser.email || 'organizer@eventpulse.com'}</p>
+                  </div>
+                  
+                  <button 
+                    onClick={() => { setActiveTab('settings'); setIsProfileOpen(false); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 hover:bg-slate-100 dark:hover:bg-zinc-850 text-slate-650 dark:text-slate-350 text-left cursor-pointer transition-colors"
+                  >
+                    <User size={14} />
+                    <span>My Profile</span>
+                  </button>
+                  <button 
+                    onClick={() => { setActiveTab('settings'); setIsProfileOpen(false); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 hover:bg-slate-100 dark:hover:bg-zinc-850 text-slate-650 dark:text-slate-350 text-left cursor-pointer transition-colors"
+                  >
+                    <Settings size={14} />
+                    <span>Settings</span>
+                  </button>
+                  
+                  <div className="h-px bg-slate-100 dark:bg-zinc-850 my-2" />
+                  
+                  <button 
+                    onClick={() => { setIsLogoutModalOpen(true); setIsProfileOpen(false); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 hover:bg-rose-50 dark:hover:bg-rose-500/10 text-rose-600 text-left cursor-pointer transition-colors"
+                  >
+                    <LogOut size={14} />
+                    <span>Log Out</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+          </div>
+        </header>
 
         {/* Scrollable Workspace Content Frame */}
         <main className="flex-1 overflow-y-auto px-4 md:px-8 py-8">

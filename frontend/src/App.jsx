@@ -1,7 +1,6 @@
-import React from 'react';
 import useLandingPage from './hooks/useLandingPage';
 
-export default function App({ onNavigate }) {
+export default function App() {
   const {
     isDemoModalOpen,
     demoRequest,
