@@ -1,13 +1,7 @@
 import { useNavigate } from 'react-router-dom';
-import Navbar from '../components/Navbar.jsx';
 
 export default function VendorPortal() {
   const navigate = useNavigate();
-
-  const handleNavigate = (page) => {
-    if (page === 'landing') navigate('/');
-    else if (page === 'events') navigate('/events');
-  };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -64,8 +58,32 @@ export default function VendorPortal() {
   return (
     <div className="min-h-screen bg-[#030712]">
 
-      {/* Unified Global Navbar */}
-      <Navbar currentPage="vendor" onNavigate={handleNavigate} />
+      {/* ── Header ─────────────────────────────────────── */}
+      <header className="flex items-center justify-between px-8 py-5 border-b border-white/[0.06] bg-white/[0.01]">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-[10px] bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center text-lg">
+            🏪
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-slate-100 leading-none mb-0.5">Vendor Portal</p>
+            <p className="text-xs text-slate-500">EventPulse Stall Management</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {/* Approval status badge */}
+          <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3.5 py-1.5 rounded-full text-xs font-semibold">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            Approved
+          </div>
+          <button
+            onClick={handleLogout}
+            className="bg-transparent border border-red-500/30 text-red-400 px-3.5 py-1.5 rounded-lg text-xs font-medium hover:border-red-400 hover:text-red-300 transition-all"
+          >
+            Logout
+          </button>
+        </div>
+      </header>
 
       {/* ── Main ───────────────────────────────────────── */}
       <main className="max-w-[860px] mx-auto px-6 py-10">

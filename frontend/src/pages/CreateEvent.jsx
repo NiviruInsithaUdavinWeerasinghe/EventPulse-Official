@@ -78,7 +78,7 @@ export default function CreateEvent({ onNavigate }) {
               setDate(new Date(data.data.date).toISOString().substring(0, 10));
             }
             setBannerPreview(data.data.bannerImageUrl);
-            setFloorMapPreview(data.data.floorMapUrl || null);
+            setFloorMapPreview(data.data.floorMapImageUrl || data.data.floorMapUrl);
           }
         } catch (err) {
           console.error("Fetch event details failed:", err);
@@ -125,19 +125,18 @@ export default function CreateEvent({ onNavigate }) {
 
   if (createdEvent) {
     return (
-      <div className="max-w-[550px] mx-auto px-6 py-20 text-center flex flex-col gap-6 items-center">
-        <span className="text-6xl animate-bounce">🎉</span>
-        <h2 className="text-3xl font-extrabold gradient-text-hero m-0">Event Created!</h2>
-        <p className="text-slate-500 text-sm leading-relaxed m-0">
-          The event has been successfully registered. You can now proceed to manage details and maps.
-        </p>
-        <div className="flex gap-3 mt-4">
-          <button 
-            onClick={() => navigate('/events')}
-            className="px-6 py-3 bg-white/5 border border-white/10 hover:bg-white/10 rounded-xl text-slate-300 hover:text-white font-semibold transition-all cursor-pointer text-sm"
-          >
-            Go to Event Dashboard
-          </button>
+      <div className="max-w-[1050px] mx-auto px-6 pt-12 pb-20">
+        <div className="max-w-[540px] mx-auto mt-16 bg-white/[0.02] border border-white/[0.06] rounded-[20px] p-12 text-center">
+          <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/25 rounded-full flex items-center justify-center text-3xl text-emerald-500 mx-auto mb-6">✓</div>
+          <h2 className="text-3xl font-bold text-slate-50 m-0 mb-2">{eventId ? 'Event Updated!' : 'Event Created!'}</h2>
+          <p className="text-slate-500 text-sm m-0 mb-6">{createdEvent.name}</p>
+          <div className="rounded-xl overflow-hidden mb-8 border border-white/[0.06]">
+            <img src={createdEvent.bannerImageUrl} alt={createdEvent.name} className="w-full max-h-[220px] object-cover block" />
+          </div>
+          <div className="flex gap-4 justify-center flex-wrap">
+            <button id="view-map-btn" onClick={() => navigate(`/map-viewer/${createdEvent._id}`)} className="btn-gradient text-white border-none px-7 py-3 text-base font-semibold rounded-lg cursor-pointer font-[inherit] transition-all duration-200">View Floor Map</button>
+            <button id="all-events-btn" onClick={() => navigate('/organizer/dashboard/events')} className="bg-white/[0.03] text-slate-50 border border-white/10 px-7 py-3 text-base font-semibold rounded-lg cursor-pointer font-[inherit] hover:bg-white/[0.08] hover:border-white/20 transition-all duration-200">All Events</button>
+          </div>
         </div>
       </div>
     );

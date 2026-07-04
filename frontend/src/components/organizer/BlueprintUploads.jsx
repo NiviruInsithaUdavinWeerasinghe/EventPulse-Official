@@ -27,7 +27,7 @@ export default function BlueprintUploads() {
         if (data.success) {
           // Map events that contain floorMap images to our blueprint format
           const mapped = data.data
-            .filter(e => e.floorMapUrl)
+            .filter(e => e.floorMapImageUrl)
             .map(e => ({
               id: `MAP-${e._id.substring(18)}`,
               name: `${e.name} Layout Blueprint`,

@@ -12,14 +12,10 @@ cloudinary.config({
 });
 
 // Helper: stream a buffer to Cloudinary
-const streamUpload = (buffer, folder, isSvg) => {
+const streamUpload = (buffer, folder) => {
   return new Promise((resolve, reject) => {
-    const options = { folder, resource_type: 'auto' };
-    if (isSvg) {
-      options.format = 'svg';
-    }
     const stream = cloudinary.uploader.upload_stream(
-      options,
+      { folder, resource_type: 'image' },
       (error, result) => {
         if (error) return reject(error);
         resolve(result);
@@ -29,23 +25,6 @@ const streamUpload = (buffer, folder, isSvg) => {
     readable.push(buffer);
     readable.push(null);
     readable.pipe(stream);
-  });
-};
-
-/**
- * Inject stable `id="vector-shape-N"` attributes on SVG shape elements that
- * have no id, so the MapViewer can reliably reference them by id.
- * Uses pure regex — no DOM parser needed on the server.
- */
-const assignMissingShapeIds = (svgStr) => {
-  const shapeTagRe = /<(path|rect|polygon|circle|ellipse)(\s[^>]*)?>/gi;
-  let counter = 0;
-  return svgStr.replace(shapeTagRe, (match, tag, attrs) => {
-    attrs = attrs || '';
-    // Already has an id attribute — leave it alone
-    if (/\bid\s*=/i.test(attrs)) return match;
-    const newId = `vector-shape-${counter++}`;
-    return `<${tag} id="${newId}"${attrs}>`;
   });
 };
 
@@ -68,22 +47,10 @@ export const createEvent = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Floor map image is required.' });
     }
 
-    const isSvg = floorMapFile.mimetype === 'image/svg+xml' || floorMapFile.originalname.endsWith('.svg');
-    const floorMapFileType = isSvg ? 'svg' : 'raster';
-    
-    let rawSvgContent = null;
-    if (isSvg) {
-      rawSvgContent = floorMapFile.buffer.toString('utf8');
-      rawSvgContent = rawSvgContent.replace(/<\?xml.*\?>/gi, '').trim();
-      // Assign stable IDs to any shapes that lack them so the viewer can
-      // reference them by id from the very first load.
-      rawSvgContent = assignMissingShapeIds(rawSvgContent);
-    }
-
     // Upload both images in parallel
     const [bannerResult, floorMapResult] = await Promise.all([
-      streamUpload(bannerFile.buffer, 'eventpulse/banners', false),
-      streamUpload(floorMapFile.buffer, 'eventpulse/floormaps', isSvg),
+      streamUpload(bannerFile.buffer, 'eventpulse/banners'),
+      streamUpload(floorMapFile.buffer, 'eventpulse/floormaps'),
     ]);
 
     const event = await Event.create({
@@ -94,9 +61,6 @@ export const createEvent = async (req, res) => {
       bannerPublicId: bannerResult.public_id,
       floorMapUrl: floorMapResult.secure_url,
       floorMapPublicId: floorMapResult.public_id,
-      floorMapFileType,
-      rawSvgContent,
-      zones: []
     });
 
     res.status(201).json({ success: true, data: event });
@@ -147,24 +111,14 @@ export const updateEvent = async (req, res) => {
 
     const uploads = [];
     if (bannerFile) {
-      uploads.push(streamUpload(bannerFile.buffer, 'eventpulse/banners', false).then(res => {
+      uploads.push(streamUpload(bannerFile.buffer, 'eventpulse/banners').then(res => {
         event.bannerImageUrl = res.secure_url;
         event.bannerPublicId = res.public_id;
       }));
     }
     if (floorMapFile) {
-      const isSvg = floorMapFile.mimetype === 'image/svg+xml' || floorMapFile.originalname.endsWith('.svg');
-      event.floorMapFileType = isSvg ? 'svg' : 'raster';
-      if (isSvg) {
-        let raw = floorMapFile.buffer.toString('utf8');
-        raw = raw.replace(/<\?xml.*\?>/gi, '').trim();
-        // Same ID assignment as in createEvent
-        event.rawSvgContent = assignMissingShapeIds(raw);
-      } else {
-        event.rawSvgContent = null;
-      }
-      uploads.push(streamUpload(floorMapFile.buffer, 'eventpulse/floormaps', isSvg).then(res => {
-        event.floorMapUrl = res.secure_url;
+      uploads.push(streamUpload(floorMapFile.buffer, 'eventpulse/floormaps').then(res => {
+        event.floorMapImageUrl = res.secure_url;
         event.floorMapPublicId = res.public_id;
       }));
     }
@@ -177,30 +131,6 @@ export const updateEvent = async (req, res) => {
     res.status(200).json({ success: true, data: event });
   } catch (error) {
     console.error('Update event error:', error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// PUT /api/events/:id/zones
-export const updateEventZones = async (req, res) => {
-  try {
-    const { zones, rawSvgContent } = req.body;
-    if (!Array.isArray(zones)) {
-      return res.status(400).json({ success: false, message: 'Zones must be an array.' });
-    }
-
-    const event = await Event.findById(req.params.id);
-    if (!event) {
-      return res.status(404).json({ success: false, message: 'Event not found.' });
-    }
-
-    event.zones = zones;
-    if (rawSvgContent !== undefined) {
-      event.rawSvgContent = rawSvgContent;
-    }
-    await event.save();
-    res.status(200).json({ success: true, data: event });
-  } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
