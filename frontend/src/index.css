@@ -7,6 +7,48 @@
   --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
   --color-brand-bg: #030712;
   --color-brand-card: rgba(255,255,255,0.02);
+  --color-accent-blue: #2563eb;
+  --color-accent-blue-light: #60a5fa;
+  --color-accent-blue-dark: #1d4ed8;
+  --color-accent-orange: #ea580c;
+  --color-accent-orange-light: #fb923c;
+  --color-accent-orange-dark: #c2410c;
+}
+
+/* Glassmorphism utility */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-modal {
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* Flashing pulsing marker for active selection */
+@keyframes map-pulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+}
+
+.marker-pulse {
+  transform-origin: center;
+  animation: map-pulse 2s infinite ease-in-out;
 }
 
 @layer base {
@@ -86,3 +128,58 @@
 
 .animate-fade-in { animation: fadeIn 0.2s ease-out; }
 .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+
+@keyframes scaleIn {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ─── Toast slide-in (GPU-composited — no layout, no paint) ───────────── */
+@keyframes toastSlideIn {
+  from {
+    transform: translateX(calc(100% + 1.5rem)) translateZ(0);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0) translateZ(0);
+    opacity: 1;
+  }
+}
+
+/* ─── Attendee SVG Map Viewer ─────────────────────────────────────────── */
+/* Base state: transparent — category colours from attendeeStyles take precedence */
+.attendee-svg-container svg .selectable-shape {
+  cursor: pointer !important;
+  transition: fill 0.15s ease, stroke 0.15s ease, stroke-width 0.15s ease !important;
+}
+
+/* Hover: subtle white highlight so the shape is still interactive */
+.attendee-svg-container svg .selectable-shape:hover {
+  fill: rgba(255, 255, 255, 0.06) !important;
+  stroke: rgba(255, 255, 255, 0.25) !important;
+  stroke-width: 1.5px !important;
+}
+
+/* ─── Organizer / Editor SVG Map Editor ───────────────────────────────── */
+#blueprint-wrapper svg path,
+#blueprint-wrapper svg rect,
+#blueprint-wrapper svg polygon,
+#blueprint-wrapper svg circle,
+#blueprint-wrapper svg ellipse {
+  cursor: pointer !important;
+  transition: fill 0.15s ease, stroke 0.15s ease !important;
+}
+
+#blueprint-wrapper svg path:hover,
+#blueprint-wrapper svg rect:hover,
+#blueprint-wrapper svg polygon:hover,
+#blueprint-wrapper svg circle:hover,
+#blueprint-wrapper svg ellipse:hover {
+  fill: rgba(59, 130, 246, 0.15) !important;
+  stroke: #3b82f6 !important;
+  stroke-width: 2px !important;
+}
