@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ExternalLink, Calendar, Plus, Minus, RefreshCw } from 'lucide-react';
+import { ExternalLink, Calendar, Plus, Minus, RefreshCw, Trash2, Layers, Sparkles } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
 const API_BASE = '/api';
 
@@ -53,6 +54,21 @@ export default function MapViewer({ eventId: propEventId }) {
   const userRole = useMemo(() => getRoleFromToken(), []);
   // isEditorMode kept so teammates can plug in without restructuring
   const isEditorMode = userRole === 'vendor'; // eslint-disable-line no-unused-vars
+
+  // ─── Editor States (EP-39 / EP-86) ────────────────────────────────────────
+  const [selectedShapes, setSelectedShapes] = useState([]); // [{ id, center }]
+  const [isModalOpen, setIsModalOpen]       = useState(false);
+  const [batchTagData, setBatchTagData]     = useState({ prefix: '', startNum: '1', commonTitle: 'Booth', category: 'Cybersecurity' });
+  const [singleTagData, setSingleTagData]   = useState({ id: '', name: '', category: 'Cybersecurity' });
+  const [isSaving, setIsSaving]             = useState(false);
+
+  // ─── Toast (shared utility — keep if not already present) ─────────────────
+  const [toasts, setToasts] = useState([]);
+  const addToast = useCallback((message, type = 'error') => {
+    const id = Date.now() + Math.random();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4500);
+  }, []);
 
   // --- Data States ----------------------------------------------------------
   const [event, setEvent]         = useState(null);
@@ -236,6 +252,174 @@ export default function MapViewer({ eventId: propEventId }) {
     return css;
   }, [event, selectedStall]);
 
+  // Orange highlight for all shapes currently in the editor selection
+  const selectedShapesStyles = useMemo(() => {
+    if (selectedShapes.length === 0) return '';
+    return selectedShapes.map(shape => `
+      #blueprint-wrapper #${shape.id} {
+        fill: rgba(234, 88, 12, 0.45) !important;
+        stroke: #ea580c !important;
+        stroke-width: 3.5px !important;
+      }
+      #blueprint-wrapper #${shape.id}:hover {
+        fill: rgba(234, 88, 12, 0.45) !important;
+        stroke: #ea580c !important;
+        stroke-width: 3.5px !important;
+      }
+    `).join('\n');
+  }, [selectedShapes]);
+
+  // Call this from handleMouseUp when isEditorMode === true and click is detected
+  function handleEditorShapeClick(target) {
+    const tagName  = target.tagName?.toLowerCase?.() || '';
+    const isSvgShape = ['path', 'rect', 'polygon', 'circle', 'ellipse'].includes(tagName);
+    if (!isSvgShape) return;
+
+    const shapeId = target.getAttribute('id') || '';
+    const wrapper = document.getElementById('blueprint-wrapper');
+    const wrapperSvg = wrapper?.querySelector('svg');
+    let center = { x: 500, y: 300 };
+    if (wrapperSvg && target.getBBox) {
+      try {
+        const bbox = target.getBBox();
+        center = { x: Math.round(bbox.x + bbox.width / 2), y: Math.round(bbox.y + bbox.height / 2) };
+      } catch {
+        // ignore
+      }
+    }
+    setSelectedShapes(prev => {
+      const exists = prev.find(s => s.id.toLowerCase() === shapeId.toLowerCase());
+      if (exists) return prev.filter(s => s.id.toLowerCase() !== shapeId.toLowerCase());
+      return [...prev, { id: shapeId, center }];
+    });
+  }
+
+  const handleOpenTagModal = useCallback(() => {
+    if (event?.zones && selectedShapes.length > 0) {
+      if (selectedShapes.length === 1) {
+        const existing = event.zones.find(z =>
+          z.id.toLowerCase() === selectedShapes[0].id.toLowerCase()
+        );
+        setSingleTagData(
+          existing
+            ? { id: existing.id, name: existing.name, category: existing.category }
+            : { id: '', name: '', category: singleTagData.category }
+        );
+      } else {
+        const existingMatches = selectedShapes
+          .map(s => event.zones.find(z => z.id.toLowerCase() === s.id.toLowerCase()))
+          .filter(Boolean);
+        if (existingMatches.length > 0) {
+          const parsed = existingMatches
+            .map(z => { const m = z.id.match(/^([A-Za-z\-_]+)(\d+)$/i); return m ? { zone: z, prefix: m[1].toUpperCase(), num: parseInt(m[2], 10) } : null; })
+            .filter(Boolean);
+          if (parsed.length > 0) {
+            parsed.sort((a, b) => a.num - b.num);
+            const { zone, prefix, num } = parsed[0];
+            const commonTitle = zone.name.replace(new RegExp(`\\s*${zone.id}\\s*$`, 'i'), '').trim() || batchTagData.commonTitle;
+            setBatchTagData({ prefix, startNum: String(num), commonTitle, category: zone.category || batchTagData.category });
+          }
+        }
+      }
+    }
+    setIsModalOpen(true);
+  }, [event, selectedShapes, batchTagData, singleTagData.category]);
+
+  const handleBatchSaveZones = async (e) => {
+    e.preventDefault();
+    if (selectedShapes.length === 0) return;
+
+    // ── SINGLE shape ──────────────────────────────────────────────────────
+    if (selectedShapes.length === 1) {
+      const shape    = selectedShapes[0];
+      const seqId    = singleTagData.id.trim().toUpperCase();
+      const name     = singleTagData.name.trim();
+      const category = singleTagData.category;
+      if (!seqId || !name) return;
+
+      setIsSaving(true);
+      let updatedZones = event.zones ? [...event.zones] : [];
+      const el = document.getElementById(shape.id);
+      if (el) { el.setAttribute('id', seqId); el.setAttribute('name', name); el.setAttribute('category', category); }
+
+      const completedZone = { id: seqId, name, category, center: shape.center };
+      const existsIndex = updatedZones.findIndex(z => z.id.toUpperCase() === shape.id.toUpperCase());
+      if (existsIndex > -1) updatedZones[existsIndex] = completedZone;
+      else updatedZones.push(completedZone);
+
+      const wrapper = document.getElementById('blueprint-wrapper');
+      try {
+        const res = await fetch(`/api/events/${eventId}/zones`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ zones: updatedZones, rawSvgContent: wrapper?.innerHTML || null })
+        });
+        if (res.ok) {
+          await fetchEvent(); setSelectedShapes([]); setIsModalOpen(false);
+          addToast(`Zone ${seqId} saved.`, 'success');
+        } else { const errData = await res.json(); addToast(`Failed to save: ${errData.message || 'Unknown error'}`); }
+      } catch (err) { console.error(err); addToast('Network error — zone could not be saved.'); }
+      finally { setIsSaving(false); }
+      return;
+    }
+
+    // ── BATCH ─────────────────────────────────────────────────────────────
+    const prefix = batchTagData.prefix.toUpperCase();
+    let startNum = parseInt(batchTagData.startNum, 10);
+    if (isNaN(startNum)) startNum = 1;
+
+    // Conflict check: block if more than 1 selected shape is already a saved zone
+    const conflictIds = selectedShapes
+      .map(shape => event.zones?.find(z => z.id.toLowerCase() === shape.id.toLowerCase())?.id)
+      .filter(Boolean);
+    if (conflictIds.length > 1) {
+      addToast(`ID conflict: ${conflictIds.join(', ')} are already saved zones. Use a different prefix or start number.`, 'error');
+      return;
+    }
+
+    setIsSaving(true);
+    let updatedZones = event.zones ? [...event.zones] : [];
+
+    selectedShapes.forEach((shape, index) => {
+      const seqId = `${prefix}${startNum + index}`;
+      const name  = `${batchTagData.commonTitle} ${seqId}`;
+      const category = batchTagData.category;
+      const el = document.getElementById(shape.id);
+      if (el) { el.setAttribute('id', seqId); el.setAttribute('name', name); el.setAttribute('category', category); }
+      const completedZone = { id: seqId, name, category, center: shape.center };
+      const existsIndex = updatedZones.findIndex(z => z.id.toUpperCase() === shape.id.toUpperCase());
+      if (existsIndex > -1) updatedZones[existsIndex] = completedZone;
+      else updatedZones.push(completedZone);
+    });
+
+    const wrapper = document.getElementById('blueprint-wrapper');
+    try {
+      const res = await fetch(`/api/events/${eventId}/zones`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ zones: updatedZones, rawSvgContent: wrapper?.innerHTML || null })
+      });
+      if (res.ok) {
+        await fetchEvent(); setSelectedShapes([]); setIsModalOpen(false);
+        addToast(`${selectedShapes.length} zone${selectedShapes.length > 1 ? 's' : ''} saved successfully.`, 'success');
+      } else { const errData = await res.json(); addToast(`Failed to save: ${errData.message || 'Unknown error'}`); }
+    } catch (err) { console.error(err); addToast('Network error — zones could not be saved.'); }
+    finally { setIsSaving(false); }
+  };
+
+  const handleDeleteZone = async (zoneId) => {
+    const el = document.getElementById(zoneId);
+    // eslint-disable-next-line react-hooks/purity
+    if (el) el.setAttribute('id', `shape-${Math.floor(1000 + Math.random() * 9000)}`);
+    const updatedZones = event.zones.filter(z => z.id !== zoneId);
+    const wrapper = document.getElementById('blueprint-wrapper');
+    try {
+      const res = await fetch(`/api/events/${eventId}/zones`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ zones: updatedZones, rawSvgContent: wrapper?.innerHTML || null })
+      });
+      if (res.ok) await fetchEvent();
+    } catch (err) { console.error(err); }
+  };
+
   // --- Shape click handler (EP-22: Interactive Polygon Selector) ------------
   // Sachin (EP-42) will extend this with a richer handler for the info card.
   const handleMapClick = useCallback((e) => {
@@ -272,7 +456,7 @@ export default function MapViewer({ eventId: propEventId }) {
     panRef.current   = newPan;
     setScale(clamped);
     setPan(newPan);
-    try { localStorage.setItem(LS_ZOOM_KEY, clamped.toFixed(4)); } catch (_) {}
+    try { localStorage.setItem(LS_ZOOM_KEY, clamped.toFixed(4)); } catch { /* ignore */ }
   }, []);
 
   const zoomAtCenter = useCallback((factor) => {
@@ -296,7 +480,7 @@ export default function MapViewer({ eventId: propEventId }) {
     panRef.current   = newPan;
     setScale(DEFAULT_ZOOM);
     setPan(newPan);
-    try { localStorage.setItem(LS_ZOOM_KEY, DEFAULT_ZOOM.toFixed(4)); } catch (_) {}
+    try { localStorage.setItem(LS_ZOOM_KEY, DEFAULT_ZOOM.toFixed(4)); } catch { /* ignore */ }
   }, [svgDimensions]);
 
   const applyZoomInput = useCallback(() => {
@@ -333,7 +517,7 @@ export default function MapViewer({ eventId: propEventId }) {
     }
   };
 
-  const handleMouseUp = (e) => {
+  const handleMouseUp = () => {
     if (!dragStartRef.current) return;
     if (!isDragActiveRef.current) {
       // Short click — delegate to shape-selection logic
@@ -341,8 +525,12 @@ export default function MapViewer({ eventId: propEventId }) {
       const tagName = target.tagName?.toLowerCase?.() || '';
       const isSvgShape = ['path', 'rect', 'polygon', 'circle', 'ellipse'].includes(tagName);
       if (isSvgShape) {
-        // Call handleMapClick from Niviru's code (or Sachin's handler)
-        handleMapClick({ target });
+        if (isEditorMode) {
+          handleEditorShapeClick(target);
+        } else {
+          // Call handleMapClick from Niviru's code (or Sachin's handler)
+          handleMapClick({ target });
+        }
       }
     }
     dragStartRef.current  = null;
@@ -461,6 +649,7 @@ export default function MapViewer({ eventId: propEventId }) {
     <div className="flex flex-col h-screen bg-[#030712] text-slate-100 font-sans">
 
       {attendeeStyles && <style dangerouslySetInnerHTML={{ __html: attendeeStyles }} />}
+      {selectedShapesStyles && <style dangerouslySetInnerHTML={{ __html: selectedShapesStyles }} />}
 
       <header className="h-14 shrink-0 bg-[#0b0f19]/90 backdrop-blur-md border-b border-white/5 px-5 flex items-center justify-between z-10">
         <div className="flex items-center gap-3">
@@ -541,7 +730,7 @@ export default function MapViewer({ eventId: propEventId }) {
               {isSvgMap && clientSvgContent ? (
                 <div
                   id="blueprint-wrapper"
-                  className="attendee-svg-container"
+                  className={isEditorMode ? "" : "attendee-svg-container"}
                   dangerouslySetInnerHTML={{ __html: clientSvgContent }}
                   style={{ lineHeight: 0, userSelect: 'none', cursor: 'default' }}
                 />
@@ -599,7 +788,63 @@ export default function MapViewer({ eventId: propEventId }) {
         {/* Right Sidebar */}
         <aside className="w-[280px] shrink-0 bg-[#0b0f19]/95 border-l border-white/5 overflow-y-auto p-5 flex flex-col gap-4">
 
-          {/* EP-39/86 (Gajindu): editor panel goes here (isEditorMode === true) */}
+          {/* ── Batch Actions widget ───────────────────────────────────── */}
+          {isEditorMode && (
+            <div className="flex flex-col gap-3 p-3 bg-white/[0.02] border border-white/[0.06] rounded-xl animate-scale-in">
+              <h2 className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+                Batch Actions {selectedShapes.length > 0 ? `(${selectedShapes.length})` : ''}
+              </h2>
+              {selectedShapes.length > 0 ? (
+                <>
+                  <p className="text-[0.7rem] text-slate-400 leading-relaxed">
+                    You have selected {selectedShapes.length} shapes. Click below to tag them.
+                  </p>
+                  <button onClick={handleOpenTagModal}
+                    className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-semibold shadow transition-all cursor-pointer">
+                    Tag Selected Shapes
+                  </button>
+                  <button onClick={() => setSelectedShapes([])}
+                    className="w-full py-1.5 bg-white/[0.02] border border-white/10 hover:bg-white/[0.08] text-slate-400 hover:text-white rounded-lg text-[0.7rem] font-semibold transition-all cursor-pointer">
+                    Deselect All
+                  </button>
+                </>
+              ) : (
+                <p className="text-[0.7rem] text-slate-500 leading-relaxed italic">
+                  No shapes selected. Click on blocks on the map layout to select and tag them in sequence.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* ── Map Zones list ─────────────────────────────────────────── */}
+          {isEditorMode && event.zones && event.zones.length > 0 && (
+            <div className="flex flex-col gap-2.5">
+              <h2 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                <Layers className="w-4 h-4 text-indigo-400" />
+                Map Zones ({event.zones.length})
+              </h2>
+              <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto pr-1">
+                {event.zones.map(zone => (
+                  <div key={zone.id} className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02] border border-white/[0.04] text-[0.7rem]">
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-extrabold text-indigo-400">{zone.id}</span>
+                        <span className="text-slate-350 font-semibold truncate max-w-[80px]">{zone.name}</span>
+                      </div>
+                      <span className="text-[0.6rem] text-slate-550 block uppercase tracking-wider">{zone.category}</span>
+                    </div>
+                    <button onClick={() => handleDeleteZone(zone.id)} title="Delete Zone"
+                      className="p-1 text-slate-500 hover:text-rose-400 hover:bg-white/[0.03] rounded transition-all cursor-pointer">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="h-px bg-white/5 my-1" />
+            </div>
+          )}
+
           {/* EP-42/43 (Sachin & Mesanda): stall info card goes here */}
 
           <div className="flex items-center justify-between gap-2">
@@ -641,6 +886,103 @@ export default function MapViewer({ eventId: propEventId }) {
           </p>
 
         </aside>
+      </div>
+
+      {isModalOpen && createPortal(
+        <div onClick={() => setIsModalOpen(false)}
+          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div onClick={e => e.stopPropagation()}
+            className="bg-[#0b0f19] border border-white/10 max-w-sm w-full p-6 rounded-xl shadow-2xl relative animate-scale-in text-left">
+            <h3 className="text-base font-bold text-slate-100 mb-4 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+              {selectedShapes.length === 1 ? 'Tag Zone' : `Batch Tag Selected (${selectedShapes.length})`}
+            </h3>
+            <form onSubmit={handleBatchSaveZones} className="flex flex-col gap-4">
+              {selectedShapes.length === 1 ? (
+                /* Single shape form */
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[0.6rem] text-slate-400 uppercase font-bold tracking-wider block mb-1">Zone ID</label>
+                    <input autoFocus required type="text" placeholder="e.g. FS3"
+                      value={singleTagData.id} onChange={e => setSingleTagData({ ...singleTagData, id: e.target.value })}
+                      className="w-full bg-white/[0.02] border border-white/8 rounded-lg px-3 py-2 text-sm text-slate-100 focus:border-amber-500 focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-[0.6rem] text-slate-400 uppercase font-bold tracking-wider block mb-1">Zone Name</label>
+                    <input required type="text" placeholder="e.g. Food Stall FS3"
+                      value={singleTagData.name} onChange={e => setSingleTagData({ ...singleTagData, name: e.target.value })}
+                      className="w-full bg-white/[0.02] border border-white/8 rounded-lg px-3 py-2 text-sm text-slate-100 focus:border-amber-500 focus:outline-none" />
+                  </div>
+                </div>
+              ) : (
+                /* Batch form */
+                <>
+                  <div>
+                    <label className="text-[0.6rem] text-slate-400 uppercase font-bold tracking-wider block mb-1">ID Prefix (e.g. A, STALL-)</label>
+                    <input autoFocus required type="text" placeholder="e.g. A"
+                      value={batchTagData.prefix} onChange={e => setBatchTagData({ ...batchTagData, prefix: e.target.value })}
+                      className="w-full bg-white/[0.02] border border-white/8 rounded-lg px-3 py-2 text-sm text-slate-100 focus:border-amber-500 focus:outline-none" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[0.6rem] text-slate-400 uppercase font-bold tracking-wider block mb-1">Start Sequence #</label>
+                      <input required type="number" min="1" placeholder="e.g. 1"
+                        value={batchTagData.startNum} onChange={e => setBatchTagData({ ...batchTagData, startNum: e.target.value })}
+                        className="w-full bg-white/[0.02] border border-white/8 rounded-lg px-3 py-2 text-sm text-slate-100 focus:border-amber-500 focus:outline-none" />
+                    </div>
+                    <div>
+                      <label className="text-[0.6rem] text-slate-400 uppercase font-bold tracking-wider block mb-1">Common Base Title</label>
+                      <input required type="text" placeholder="e.g. Booth"
+                        value={batchTagData.commonTitle} onChange={e => setBatchTagData({ ...batchTagData, commonTitle: e.target.value })}
+                        className="w-full bg-white/[0.02] border border-white/8 rounded-lg px-3 py-2 text-sm text-slate-100 focus:border-amber-500 focus:outline-none" />
+                    </div>
+                  </div>
+                </>
+              )}
+              <div>
+                <label className="text-[0.6rem] text-slate-400 uppercase font-bold tracking-wider block mb-1">Zone Category Sector</label>
+                <select
+                  value={selectedShapes.length === 1 ? singleTagData.category : batchTagData.category}
+                  onChange={e => selectedShapes.length === 1 ? setSingleTagData({ ...singleTagData, category: e.target.value }) : setBatchTagData({ ...batchTagData, category: e.target.value })}
+                  className="w-full bg-[#0d111d] border border-white/8 rounded-lg px-3 py-2 text-sm text-slate-100 focus:border-amber-500 focus:outline-none">
+                  <option value="Cybersecurity">Cybersecurity</option>
+                  <option value="Biotechnology">Biotechnology</option>
+                  <option value="Artificial Intelligence">Artificial Intelligence</option>
+                  <option value="Clean Energy">Clean Energy</option>
+                  <option value="Robotics">Robotics</option>
+                  <option value="Hardware">Hardware</option>
+                  <option value="Presentation Area">Presentation Area</option>
+                  <option value="Refreshments">Refreshments</option>
+                  <option value="Restrooms">Restrooms</option>
+                </select>
+              </div>
+              <div className="flex gap-2 justify-end mt-2">
+                <button type="button" onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 bg-white/[0.02] border border-white/10 rounded-lg text-xs text-slate-400 hover:text-white transition-all cursor-pointer">Cancel</button>
+                <button type="submit" disabled={isSaving}
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-lg text-xs font-semibold shadow transition-all cursor-pointer">
+                  {isSaving ? 'Saving...' : `Save Zone${selectedShapes.length > 1 ? 's' : ''} (${selectedShapes.length})`}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* GPU-accelerated toast notifications */}
+      <div className="fixed top-4 right-4 flex flex-col gap-2 z-[200] pointer-events-none" aria-live="polite">
+        {toasts.map(toast => (
+          <div key={toast.id}
+            className={`pointer-events-auto flex items-start gap-3 pl-4 pr-3 py-3 rounded-xl shadow-2xl border backdrop-blur-md text-xs font-medium max-w-[22rem] leading-snug
+              ${toast.type === 'error' ? 'bg-rose-950/95 border-rose-500/30 text-rose-100' : 'bg-emerald-950/95 border-emerald-500/30 text-emerald-100'}`}
+            style={{ animation: 'toastSlideIn 0.38s cubic-bezier(0.16,1,0.3,1) both', willChange: 'transform, opacity', transform: 'translateZ(0)' }}>
+            <span className="text-sm shrink-0 mt-px">{toast.type === 'error' ? '⚠️' : '✅'}</span>
+            <span className="flex-1">{toast.message}</span>
+            <button onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+              className={`shrink-0 ml-1 opacity-50 hover:opacity-100 text-base leading-none transition-opacity cursor-pointer ${toast.type === 'error' ? 'text-rose-300' : 'text-emerald-300'}`}>×</button>
+          </div>
+        ))}
       </div>
     </div>
   );
