@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ExternalLink, Calendar } from 'lucide-react';
+import { ExternalLink, Calendar, Plus, Minus, RefreshCw } from 'lucide-react';
 
 const API_BASE = '/api';
 
@@ -35,6 +35,16 @@ const CATEGORY_STYLES = {
 };
 const DEFAULT_ZONE_STYLE = { fill: 'rgba(37, 99, 235, 0.2)', stroke: '#3b82f6' };
 
+const LS_ZOOM_KEY = 'ep-map-zoom';
+const DEFAULT_ZOOM = 1.25;
+const getInitialScale = () => {
+  try {
+    const saved = parseFloat(localStorage.getItem(LS_ZOOM_KEY));
+    if (!isNaN(saved) && saved >= 0.3 && saved <= 5) return saved;
+  } catch (_) {}
+  return DEFAULT_ZOOM;
+};
+
 export default function MapViewer({ eventId: propEventId }) {
   const { eventId: paramEventId } = useParams();
   const eventId = propEventId || paramEventId;
@@ -49,12 +59,28 @@ export default function MapViewer({ eventId: propEventId }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError]         = useState('');
 
-  // EP-22: Polygon selector � tracks the currently highlighted zone
+  // EP-22: Polygon selector — tracks the currently highlighted zone
   const [selectedStall, setSelectedStall] = useState(null);
 
   // --- SVG States -----------------------------------------------------------
   const [clientSvgContent, setClientSvgContent] = useState(null);
   const [svgDimensions, setSvgDimensions]       = useState({ w: 1000, h: 600 });
+
+  // ─── Pan / Zoom States (EP-23) ─────────────────────────────────────────────
+  const [scale, setScale] = useState(getInitialScale);
+  const [pan, setPan]     = useState({ x: 0, y: 0 });
+  const [zoomInput, setZoomInput]       = useState('');
+  const [isEditingZoom, setIsEditingZoom] = useState(false);
+  const [touchStartDist, setTouchStartDist]   = useState(0);
+  const [touchStartScale, setTouchStartScale] = useState(1);
+
+  // Live refs — kept in sync synchronously to avoid stale-closure glitches
+  const scaleRef      = useRef(getInitialScale());
+  const panRef        = useRef({ x: 0, y: 0 });
+  const dragStartRef  = useRef(null);    // { clientX, clientY, panX, panY, target }
+  const isDragActiveRef = useRef(false); // true once movement exceeds 4 px threshold
+  const containerRef  = useRef(null);
+  const centeredRef   = useRef(false);
 
   // --- Fetch Event ----------------------------------------------------------
   const fetchEvent = async () => {
@@ -145,6 +171,33 @@ export default function MapViewer({ eventId: propEventId }) {
     }
   }, [event, processSvgText]);
 
+  // Reset centered state on event change
+  useEffect(() => {
+    centeredRef.current = false;
+  }, [eventId]);
+
+  // ─── Center map once SVG content + container are ready ────────────────────
+  useEffect(() => {
+    if (!clientSvgContent || centeredRef.current) return;
+    const raf = requestAnimationFrame(() => {
+      const container = containerRef.current;
+      if (!container) return;
+      const cw = container.clientWidth;
+      const ch = container.clientHeight;
+      const targetScale = scaleRef.current;
+      const centeredPan = {
+        x: (cw - svgDimensions.w * targetScale) / 2,
+        y: (ch - svgDimensions.h * targetScale) / 2,
+      };
+      panRef.current   = centeredPan;
+      scaleRef.current = targetScale;
+      setPan(centeredPan);
+      setScale(targetScale);
+      centeredRef.current = true;
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [clientSvgContent, svgDimensions]);
+
   // --- Zone colour + selection styles (EP-22: Visual Block Distinction) ------
   const attendeeStyles = useMemo(() => {
     if (!event?.zones) return '';
@@ -207,6 +260,168 @@ export default function MapViewer({ eventId: propEventId }) {
   }, [event]);
 
   // --- Helpers --------------------------------------------------------------
+  // ─── Zoom helpers — all use refs, no stale-closure issues ─────────────────
+  const applyZoom = useCallback((newScale, originX, originY) => {
+    const clamped = Math.min(Math.max(newScale, 0.3), 5);
+    const ratio   = clamped / scaleRef.current;
+    const newPan  = {
+      x: originX - ratio * (originX - panRef.current.x),
+      y: originY - ratio * (originY - panRef.current.y),
+    };
+    scaleRef.current = clamped;
+    panRef.current   = newPan;
+    setScale(clamped);
+    setPan(newPan);
+    try { localStorage.setItem(LS_ZOOM_KEY, clamped.toFixed(4)); } catch (_) {}
+  }, []);
+
+  const zoomAtCenter = useCallback((factor) => {
+    const c = containerRef.current;
+    if (!c) return;
+    applyZoom(scaleRef.current * factor, c.clientWidth / 2, c.clientHeight / 2);
+  }, [applyZoom]);
+
+  const handleZoomIn  = useCallback(() => zoomAtCenter(1.15),     [zoomAtCenter]);
+  const handleZoomOut = useCallback(() => zoomAtCenter(1 / 1.15), [zoomAtCenter]);
+
+  const handleResetZoom = useCallback(() => {
+    if (!containerRef.current) return;
+    const cw = containerRef.current.clientWidth;
+    const ch = containerRef.current.clientHeight;
+    const newPan = {
+      x: (cw - svgDimensions.w * DEFAULT_ZOOM) / 2,
+      y: (ch - svgDimensions.h * DEFAULT_ZOOM) / 2,
+    };
+    scaleRef.current = DEFAULT_ZOOM;
+    panRef.current   = newPan;
+    setScale(DEFAULT_ZOOM);
+    setPan(newPan);
+    try { localStorage.setItem(LS_ZOOM_KEY, DEFAULT_ZOOM.toFixed(4)); } catch (_) {}
+  }, [svgDimensions]);
+
+  const applyZoomInput = useCallback(() => {
+    const pct = parseInt(zoomInput, 10);
+    if (!isNaN(pct) && pct > 0) {
+      const c = containerRef.current;
+      if (c) applyZoom(pct / 100, c.clientWidth / 2, c.clientHeight / 2);
+    }
+    setIsEditingZoom(false);
+    setZoomInput('');
+  }, [zoomInput, applyZoom]);
+
+  const handleMouseDown = (e) => {
+    if (e.button !== 0) return;
+    dragStartRef.current = {
+      clientX: e.clientX, clientY: e.clientY,
+      panX: panRef.current.x, panY: panRef.current.y,
+      target: e.target,
+    };
+    isDragActiveRef.current = false;
+    e.preventDefault();
+  };
+
+  const handleMouseMove = (e) => {
+    if (!dragStartRef.current) return;
+    const dx = e.clientX - dragStartRef.current.clientX;
+    const dy = e.clientY - dragStartRef.current.clientY;
+    if (!isDragActiveRef.current && (Math.abs(dx) > 4 || Math.abs(dy) > 4))
+      isDragActiveRef.current = true;
+    if (isDragActiveRef.current) {
+      const newPan = { x: dragStartRef.current.panX + dx, y: dragStartRef.current.panY + dy };
+      panRef.current = newPan;
+      setPan(newPan);
+    }
+  };
+
+  const handleMouseUp = (e) => {
+    if (!dragStartRef.current) return;
+    if (!isDragActiveRef.current) {
+      // Short click — delegate to shape-selection logic
+      const target = dragStartRef.current.target;
+      const tagName = target.tagName?.toLowerCase?.() || '';
+      const isSvgShape = ['path', 'rect', 'polygon', 'circle', 'ellipse'].includes(tagName);
+      if (isSvgShape) {
+        // Call handleMapClick from Niviru's code (or Sachin's handler)
+        handleMapClick({ target });
+      }
+    }
+    dragStartRef.current  = null;
+    isDragActiveRef.current = false;
+  };
+
+  const handleMouseLeave = () => {
+    if (isDragActiveRef.current) {
+      dragStartRef.current  = null;
+      isDragActiveRef.current = false;
+    }
+  };
+
+  // Cursor-relative wheel zoom — must use passive: false to call preventDefault
+  const handleWheel = useCallback((e) => {
+    e.preventDefault();
+    const container = containerRef.current;
+    if (!container) return;
+    const rect   = container.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const delta  = e.deltaY < 0 ? 1.1 : 0.9;
+    applyZoom(scaleRef.current * delta, mouseX, mouseY);
+  }, [applyZoom]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, [handleWheel, isLoading]); // re-attach after loading so ref is populated
+
+  const getTouchDist = (touches) => {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  const handleTouchStart = (e) => {
+    if (e.touches.length === 2) {
+      setTouchStartDist(getTouchDist(e.touches));
+      setTouchStartScale(scaleRef.current);
+      dragStartRef.current = null;
+    } else if (e.touches.length === 1) {
+      dragStartRef.current = {
+        clientX: e.touches[0].clientX, clientY: e.touches[0].clientY,
+        panX: panRef.current.x, panY: panRef.current.y,
+        target: e.target,
+      };
+      isDragActiveRef.current = false;
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    e.preventDefault();
+    if (e.touches.length === 2 && touchStartDist > 0) {
+      const newDist  = getTouchDist(e.touches);
+      const newScale = Math.min(Math.max(touchStartScale * (newDist / touchStartDist), 0.3), 5);
+      scaleRef.current = newScale;
+      setScale(newScale);
+    } else if (e.touches.length === 1 && dragStartRef.current) {
+      const dx = e.touches[0].clientX - dragStartRef.current.clientX;
+      const dy = e.touches[0].clientY - dragStartRef.current.clientY;
+      if (!isDragActiveRef.current && (Math.abs(dx) > 4 || Math.abs(dy) > 4))
+        isDragActiveRef.current = true;
+      if (isDragActiveRef.current) {
+        const newPan = { x: dragStartRef.current.panX + dx, y: dragStartRef.current.panY + dy };
+        panRef.current = newPan;
+        setPan(newPan);
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    dragStartRef.current  = null;
+    isDragActiveRef.current = false;
+    setTouchStartDist(0);
+  };
+
   const formatDate = (dateStr) => {
     if (!dateStr) return null;
     return new Date(dateStr).toLocaleDateString('en-US', {
@@ -266,7 +481,33 @@ export default function MapViewer({ eventId: propEventId }) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {/* EP-23 (Hirantha): zoom badge goes here */}
+          {/* ── Zoom badge ──────────────────────────────────────────────── */}
+          <div className="flex items-center gap-0.5 bg-white/[0.04] border border-white/8 rounded-lg overflow-hidden">
+            <button onClick={handleZoomOut} title="Zoom Out"
+              className="px-2 py-1.5 text-slate-400 hover:text-white hover:bg-white/10 transition-colors text-xs font-bold cursor-pointer">−</button>
+            <div className="h-4 w-px bg-white/10" />
+            {isEditingZoom ? (
+              <input type="number" value={zoomInput}
+                onChange={(e) => setZoomInput(e.target.value)}
+                onBlur={applyZoomInput}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') applyZoomInput();
+                  if (e.key === 'Escape') { setIsEditingZoom(false); setZoomInput(''); }
+                }}
+                autoFocus
+                className="w-14 text-center text-[0.65rem] font-mono bg-transparent border-none outline-none text-slate-100 py-1"
+              />
+            ) : (
+              <button onClick={() => { setIsEditingZoom(true); setZoomInput(String(Math.round(scale * 100))); }}
+                title="Click to type a zoom %"
+                className="w-14 text-center text-[0.65rem] font-mono text-slate-400 hover:text-white py-1 cursor-text transition-colors">
+                {Math.round(scale * 100)}%
+              </button>
+            )}
+            <div className="h-4 w-px bg-white/10" />
+            <button onClick={handleZoomIn} title="Zoom In"
+              className="px-2 py-1.5 text-slate-400 hover:text-white hover:bg-white/10 transition-colors text-xs font-bold cursor-pointer">+</button>
+          </div>
           <span className="bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[0.65rem] font-bold px-2.5 py-1 rounded-full tracking-widest uppercase">
             Interactive Plan Mode
           </span>
@@ -283,26 +524,36 @@ export default function MapViewer({ eventId: propEventId }) {
 
       <div className="flex flex-1 overflow-hidden">
 
-        {/* EP-22: Map canvas � SVG renderer + polygon click selector */}
-        {/* EP-23 (Hirantha): wrap inner div with transform-based zoom/pan */}
-        <div className="flex-1 overflow-auto relative map-grid-bg">
-          <div className="min-h-full min-w-full flex items-center justify-center p-6">
-            {isSvgMap && clientSvgContent ? (
-              <div
-                id="blueprint-wrapper"
-                className="attendee-svg-container"
-                dangerouslySetInnerHTML={{ __html: clientSvgContent }}
-                onClick={handleMapClick}
-                style={{ lineHeight: 0, userSelect: 'none', cursor: 'default' }}
-              />
-            ) : (
-              <img
-                src={event.floorMapUrl}
-                alt={`${event.name} floor map`}
-                className="block max-w-full pointer-events-none rounded-lg"
-                draggable={false}
-              />
-            )}
+        <div
+          ref={containerRef}
+          className="flex-1 overflow-hidden relative select-none map-grid-bg cursor-grab active:cursor-grabbing"
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseLeave}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          {/* Panning / zoom wrapper */}
+          <div style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`, transformOrigin: '0 0', display: 'inline-block' }}>
+            <div className="min-h-full min-w-full flex items-center justify-center p-6">
+              {isSvgMap && clientSvgContent ? (
+                <div
+                  id="blueprint-wrapper"
+                  className="attendee-svg-container"
+                  dangerouslySetInnerHTML={{ __html: clientSvgContent }}
+                  style={{ lineHeight: 0, userSelect: 'none', cursor: 'default' }}
+                />
+              ) : (
+                <img
+                  src={event.floorMapUrl}
+                  alt={`${event.name} floor map`}
+                  className="block max-w-full pointer-events-none rounded-lg"
+                  draggable={false}
+                />
+              )}
+            </div>
           </div>
 
           {/* EP-22: Map Legend */}
@@ -329,6 +580,20 @@ export default function MapViewer({ eventId: propEventId }) {
           })()}
 
           {/* EP-23 (Hirantha): zoom control buttons go here */}
+          <div className="absolute bottom-5 right-5 flex flex-col gap-1.5 z-20">
+            <button onClick={handleZoomIn} title="Zoom In"
+              className="w-9 h-9 rounded-xl bg-[#0b0f19]/90 border border-white/10 text-slate-300 hover:text-white hover:bg-white/10 flex items-center justify-center transition-all shadow-lg cursor-pointer backdrop-blur-md">
+              <Plus className="w-4 h-4" />
+            </button>
+            <button onClick={handleZoomOut} title="Zoom Out"
+              className="w-9 h-9 rounded-xl bg-[#0b0f19]/90 border border-white/10 text-slate-300 hover:text-white hover:bg-white/10 flex items-center justify-center transition-all shadow-lg cursor-pointer backdrop-blur-md">
+              <Minus className="w-4 h-4" />
+            </button>
+            <button onClick={handleResetZoom} title="Reset Zoom"
+              className="w-9 h-9 rounded-xl bg-[#0b0f19]/90 border border-white/10 text-slate-300 hover:text-white hover:bg-white/10 flex items-center justify-center transition-all shadow-lg cursor-pointer backdrop-blur-md">
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Right Sidebar */}
