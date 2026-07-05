@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ExternalLink, Calendar, Plus, Minus, RefreshCw, Trash2, Layers, Sparkles } from 'lucide-react';
+import { ExternalLink, Calendar, Plus, Minus, RefreshCw, Trash2, Layers, Sparkles, MapPin, Tag, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 const API_BASE = '/api';
@@ -420,26 +420,57 @@ export default function MapViewer({ eventId: propEventId }) {
     } catch (err) { console.error(err); }
   };
 
-  // --- Shape click handler (EP-22: Interactive Polygon Selector) ------------
-  // Sachin (EP-42) will extend this with a richer handler for the info card.
+  // EP-42: Enhanced shape click — triggers informational callback for zones
   const handleMapClick = useCallback((e) => {
     const target  = e.target;
-    const tagName = target.tagName?.toLowerCase?.() || '';
+    if (!target) return;
+    const tagName    = target.tagName?.toLowerCase?.() || '';
     const isSvgShape = ['path', 'rect', 'polygon', 'circle', 'ellipse'].includes(tagName);
 
-    if (!isSvgShape) { setSelectedStall(null); return; }
+    // Click on canvas background (non-shape) → dismiss any open card
+    if (!isSvgShape) {
+      setSelectedStall(null);
+      return;
+    }
 
-    const shapeId = target.getAttribute('id') || '';
+    const rawId = target.getAttribute('id') || '';
 
-    const zone = event?.zones?.find(z => z.id && z.id.toLowerCase() === shapeId.toLowerCase())
-      ?? event?.zones?.find(z => z.id && shapeId.toLowerCase().includes(z.id.toLowerCase()));
+    // 1. Exact ID match against saved zones
+    const exactZone = event?.zones?.find(
+      z => z.id && z.id.toLowerCase() === rawId.toLowerCase()
+    );
 
-    if (zone) { setSelectedStall(zone); return; }
+    if (exactZone) {
+      setSelectedStall({
+        id:       exactZone.id,
+        name:     exactZone.name || exactZone.id,
+        category: exactZone.category || 'Uncategorised',
+        center:   exactZone.center || null,
+      });
+      return;
+    }
 
+    // 2. Partial match (handles minor ID prefix/suffix variations)
+    const partialZone = event?.zones?.find(
+      z => z.id && rawId.toLowerCase().includes(z.id.toLowerCase())
+    );
+
+    if (partialZone) {
+      setSelectedStall({
+        id:       partialZone.id,
+        name:     partialZone.name || partialZone.id,
+        category: partialZone.category || 'Uncategorised',
+        center:   partialZone.center || null,
+      });
+      return;
+    }
+
+    // 3. Untagged / unknown shape — still provide visual feedback
     setSelectedStall({
-      id: shapeId,
-      name: `Space ${shapeId.replace(/^vector-shape-/, '#').replace(/^shape-/, '#')}`,
-      category: 'Untagged',
+      id:       rawId,
+      name:     `Space ${rawId.replace(/^vector-shape-/, '#').replace(/^shape-/, '#')}`,
+      category: 'Untagged Space',
+      center:   null,
     });
   }, [event]);
 
