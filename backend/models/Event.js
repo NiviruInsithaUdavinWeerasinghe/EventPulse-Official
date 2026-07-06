@@ -1,5 +1,16 @@
 import mongoose from 'mongoose';
 
+const zoneSchema = new mongoose.Schema({
+  id: { type: String, required: true },
+  name: { type: String, required: true },
+  category: { type: String, required: true },
+  center: {
+    x: { type: Number, required: true },
+    y: { type: Number, required: true }
+  },
+  points: { type: String }
+});
+
 const eventSchema = new mongoose.Schema(
   {
     name: {
@@ -32,6 +43,15 @@ const eventSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    floorMapFileType: {
+      type: String,
+      enum: ['svg', 'raster'],
+      default: 'raster',
+    },
+    rawSvgContent: {
+      type: String,
+    },
+    zones: [zoneSchema],
   },
   { timestamps: true }
 );

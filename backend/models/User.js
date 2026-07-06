@@ -7,6 +7,12 @@ const userSchema = new mongoose.Schema({
   phone:    { type: String, required: true, trim: true },
   password: { type: String, required: true },
   role:     { type: String, enum: ['organizer', 'vendor', 'customer'], default: 'customer' },
+<<<<<<< HEAD
+  googleId: { type: String },
+  avatar:   { type: String },
+=======
+  walletBalance: { type: Number, default: 24750 } // Defaults to original mockup balance
+>>>>>>> 39e6a260d2af63b8793e7ee75a87215c390f4425
 }, { timestamps: true });
 
 userSchema.pre('save', async function (next) {

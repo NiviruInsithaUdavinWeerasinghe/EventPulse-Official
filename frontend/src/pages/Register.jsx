@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { User, Mail, Lock, Phone, ArrowRight } from "lucide-react";
+import { User, Mail, Lock, Phone, ArrowRight, Sparkles } from "lucide-react";
+import { GoogleLogin } from "@react-oauth/google";
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -40,6 +41,7 @@ export default function Register() {
       const data = await res.json();
       if (!res.ok) return setError(data.message || "Registration failed.");
       localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
       navigate("/dashboard");
     } catch {
       setError("Network error. Please try again.");
@@ -48,37 +50,96 @@ export default function Register() {
     }
   };
 
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [googlePayload, setGooglePayload] = useState(null);
+
+  const handleGoogleSuccess = async (response) => {
+    setError("");
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/google-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ credential: response.credential }),
+      });
+      const data = await res.json();
+      if (!res.ok) return setError(data.message || "Google registration failed.");
+      
+      if (data.isNewUser) {
+        setGooglePayload(data);
+        setShowRoleModal(true);
+      } else {
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+        navigate("/dashboard");
+      }
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRoleSelection = async (selectedRole) => {
+    setShowRoleModal(false);
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/google-set-role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: googlePayload.user.id, role: selectedRole }),
+      });
+      const data = await res.json();
+      if (!res.ok) return setError(data.message || "Setting role failed.");
+      
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+      navigate("/dashboard");
+    } catch {
+      setError("Network error setting role.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const roles = [
-    { value: "customer",  label: "Customer",  desc: "Browse events & explore floorplans", icon: "🎟️" },
+    { value: "customer",  label: "Customer",  desc: "Browse events & explore layouts", icon: "🎟️" },
     { value: "vendor",    label: "Vendor",     desc: "Manage stalls & business profile",   icon: "🏪" },
     { value: "organizer", label: "Organizer",  desc: "Create & coordinate events",         icon: "🗂️" },
   ];
 
   return (
-    <div className="w-full max-w-md my-8 px-6 py-8 bg-white dark:bg-slate-800 rounded-2xl shadow-xl dark:shadow-slate-900/50 border border-slate-100 dark:border-slate-700 transition-all duration-300">
-      <div className="text-center mb-8">
-        <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-2">
+    <div className="w-full max-w-[480px] my-8 px-8 py-10 rounded-3xl border border-white/10 bg-white/[0.02] shadow-[0_20px_50px_rgba(0,0,0,0.5)] backdrop-blur-xl relative overflow-hidden transition-all duration-300">
+      {/* Background radial soft light overlay */}
+      <div className="absolute -top-24 -left-24 w-48 h-48 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-purple-500/10 blur-3xl pointer-events-none" />
+
+      <div className="text-center mb-8 relative z-10">
+        <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 mb-4">
+          <Sparkles className="text-indigo-400" size={22} />
+        </div>
+        <h2 className="text-3xl font-extrabold text-white tracking-tight mb-2">
           Create Your Account
         </h2>
-        <p className="text-slate-500 dark:text-slate-400">
-          Join us and get started in seconds
+        <p className="text-slate-400 text-sm">
+          Join EventPulse and coordinate/explore events.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-5 relative z-10">
 
         {/* Full Name */}
         <div className="space-y-2">
-          <label htmlFor="fullName" className="text-sm font-medium text-slate-700 dark:text-slate-300 block">
+          <label htmlFor="fullName" className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
             Full Name
           </label>
           <div className="relative group">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-500 transition-colors">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500 group-focus-within:text-indigo-400 transition-colors">
               <User size={18} />
             </div>
             <input
               id="fullName" type="text" value={formData.fullName} onChange={handleChange}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 outline-none"
+              className="w-full pl-11 pr-4 py-3 bg-white/[0.03] border border-white/[0.08] rounded-xl focus:border-indigo-500 focus:shadow-[0_0_0_2px_rgba(99,102,241,0.2)] text-white placeholder-slate-500 transition-all duration-200 outline-none"
               placeholder="Enter your full name" required
             />
           </div>
@@ -86,16 +147,16 @@ export default function Register() {
 
         {/* Email */}
         <div className="space-y-2">
-          <label htmlFor="email" className="text-sm font-medium text-slate-700 dark:text-slate-300 block">
+          <label htmlFor="email" className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
             Email Address
           </label>
           <div className="relative group">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-500 transition-colors">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500 group-focus-within:text-indigo-400 transition-colors">
               <Mail size={18} />
             </div>
             <input
               id="email" type="email" value={formData.email} onChange={handleChange}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 outline-none"
+              className="w-full pl-11 pr-4 py-3 bg-white/[0.03] border border-white/[0.08] rounded-xl focus:border-indigo-500 focus:shadow-[0_0_0_2px_rgba(99,102,241,0.2)] text-white placeholder-slate-500 transition-all duration-200 outline-none"
               placeholder="Enter your email" required
             />
           </div>
@@ -103,24 +164,24 @@ export default function Register() {
 
         {/* Phone */}
         <div className="space-y-2">
-          <label htmlFor="phone" className="text-sm font-medium text-slate-700 dark:text-slate-300 block">
+          <label htmlFor="phone" className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
             Phone Number
           </label>
           <div className="relative group">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-500 transition-colors">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500 group-focus-within:text-indigo-400 transition-colors">
               <Phone size={18} />
             </div>
             <input
               id="phone" type="tel" value={formData.phone} onChange={handleChange}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 outline-none"
+              className="w-full pl-11 pr-4 py-3 bg-white/[0.03] border border-white/[0.08] rounded-xl focus:border-indigo-500 focus:shadow-[0_0_0_2px_rgba(99,102,241,0.2)] text-white placeholder-slate-500 transition-all duration-200 outline-none"
               placeholder="Enter your phone number" required
             />
           </div>
         </div>
 
-        {/* Role selector — EP-76 */}
+        {/* Role selector */}
         <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300 block">
+          <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
             I am a...
           </label>
           <div className="grid grid-cols-3 gap-2">
@@ -129,10 +190,10 @@ export default function Register() {
                 key={value}
                 type="button"
                 onClick={() => setFormData((prev) => ({ ...prev, role: value }))}
-                className={`flex flex-col items-center gap-1 p-3 rounded-xl border text-center transition-all duration-200
+                className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-center transition-all duration-200 cursor-pointer
                   ${formData.role === value
-                    ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
-                    : "border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-indigo-300 hover:text-indigo-500"
+                    ? "border-indigo-500 bg-indigo-500/10 text-indigo-400 shadow-md shadow-indigo-500/5"
+                    : "border-white/10 text-slate-400 hover:border-indigo-500/30 hover:text-indigo-300 bg-white/[0.01]"
                   }`}
               >
                 <span className="text-xl">{icon}</span>
@@ -145,16 +206,16 @@ export default function Register() {
 
         {/* Password */}
         <div className="space-y-2">
-          <label htmlFor="password" className="text-sm font-medium text-slate-700 dark:text-slate-300 block">
+          <label htmlFor="password" className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
             Password
           </label>
           <div className="relative group">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-500 transition-colors">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500 group-focus-within:text-indigo-400 transition-colors">
               <Lock size={18} />
             </div>
             <input
               id="password" type="password" value={formData.password} onChange={handleChange}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 outline-none"
+              className="w-full pl-11 pr-4 py-3 bg-white/[0.03] border border-white/[0.08] rounded-xl focus:border-indigo-500 focus:shadow-[0_0_0_2px_rgba(99,102,241,0.2)] text-white placeholder-slate-500 transition-all duration-200 outline-none"
               placeholder="Create a password" required
             />
           </div>
@@ -162,16 +223,16 @@ export default function Register() {
 
         {/* Confirm Password */}
         <div className="space-y-2">
-          <label htmlFor="confirmPassword" className="text-sm font-medium text-slate-700 dark:text-slate-300 block">
+          <label htmlFor="confirmPassword" className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
             Confirm Password
           </label>
           <div className="relative group">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-500 transition-colors">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500 group-focus-within:text-indigo-400 transition-colors">
               <Lock size={18} />
             </div>
             <input
               id="confirmPassword" type="password" value={formData.confirmPassword} onChange={handleChange}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 outline-none"
+              className="w-full pl-11 pr-4 py-3 bg-white/[0.03] border border-white/[0.08] rounded-xl focus:border-indigo-500 focus:shadow-[0_0_0_2px_rgba(99,102,241,0.2)] text-white placeholder-slate-500 transition-all duration-200 outline-none"
               placeholder="Confirm your password" required
             />
           </div>
@@ -182,57 +243,83 @@ export default function Register() {
           <div className="relative flex items-center justify-center mt-0.5">
             <input
               type="checkbox" required
-              className="peer shrink-0 appearance-none w-4 h-4 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 checked:bg-indigo-500 checked:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all"
+              className="peer shrink-0 appearance-none w-4.5 h-4.5 border border-white/10 rounded bg-white/[0.02] checked:bg-indigo-500 checked:border-indigo-500 focus:outline-none transition-all"
             />
-            <svg className="absolute w-3 h-3 pointer-events-none opacity-0 peer-checked:opacity-100 text-white fill-current transition-opacity" viewBox="0 0 20 20">
+            <svg className="absolute w-3.5 h-3.5 pointer-events-none opacity-0 peer-checked:opacity-100 text-white fill-current transition-opacity" viewBox="0 0 20 20">
               <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
             </svg>
           </div>
-          <span className="text-sm text-slate-600 dark:text-slate-400 group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors leading-relaxed">
+          <span className="text-sm text-slate-400 group-hover:text-slate-200 transition-colors leading-relaxed">
             I agree to the{" "}
-            <a href="#terms" className="text-indigo-600 dark:text-indigo-400 hover:underline">Terms & Conditions</a>{" "}
+            <a href="#terms" className="text-indigo-400 hover:underline">Terms & Conditions</a>{" "}
             and{" "}
-            <a href="#privacy" className="text-indigo-600 dark:text-indigo-400 hover:underline">Privacy Policy</a>
+            <a href="#privacy" className="text-indigo-400 hover:underline">Privacy Policy</a>
           </span>
         </label>
 
-        {error && <p className="text-sm text-red-500 dark:text-red-400 text-center">{error}</p>}
+        {error && (
+          <p className="text-sm text-red-400 text-center font-medium bg-red-500/10 border border-red-500/20 py-2.5 rounded-xl">{error}</p>
+        )}
 
         <button
           type="submit" disabled={loading}
-          className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-semibold py-2.5 px-4 rounded-lg transition-all duration-200 active:scale-[0.98] shadow-md shadow-indigo-600/20 mt-2"
+          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:opacity-90 active:scale-[0.98] disabled:opacity-60 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-200 shadow-lg shadow-indigo-500/20 cursor-pointer mt-2"
         >
           {loading ? "Creating account..." : "Create Account"}
           {!loading && <ArrowRight size={18} />}
         </button>
       </form>
 
-      <div className="mt-8 mb-6 relative flex items-center justify-center">
-        <div className="absolute w-full border-t border-slate-200 dark:border-slate-700"></div>
-        <div className="relative px-4 text-xs font-medium text-slate-400 bg-white dark:bg-slate-800 uppercase tracking-wider">
+      <div className="mt-8 mb-6 relative flex items-center justify-center z-10">
+        <div className="absolute w-full border-t border-white/5"></div>
+        <div className="relative px-4 text-xs font-semibold text-slate-500 bg-[#030712] uppercase tracking-wider">
           Or continue with
         </div>
       </div>
 
-      <button
-        type="button"
-        className="w-full flex items-center justify-center gap-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 font-medium py-2.5 px-4 rounded-lg transition-colors duration-200 shadow-sm"
-      >
-        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-        </svg>
-        Sign up with Google
-      </button>
+      <div className="flex justify-center z-10 relative">
+        <GoogleLogin
+          onSuccess={handleGoogleSuccess}
+          onError={() => setError("Google registration failed. Please try again.")}
+          theme="filled_dark"
+          shape="pill"
+        />
+      </div>
 
-      <div className="mt-8 text-center text-sm text-slate-600 dark:text-slate-400">
+      <div className="mt-8 text-center text-sm text-slate-400 z-10 relative">
         Already have an account?{" "}
-        <Link to="/login" className="font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 transition-colors">
+        <Link to="/login" className="font-semibold text-indigo-400 hover:text-indigo-300 transition-colors">
           Sign In
         </Link>
       </div>
+
+      {showRoleModal && (
+        <div className="fixed inset-0 bg-[#030712]/90 backdrop-blur-md flex items-center justify-center z-[2000] p-6 animate-fade-in">
+          <div className="bg-[#0b0f19] border border-white/10 rounded-3xl p-8 w-full max-w-[440px] shadow-2xl relative animate-slide-up text-center">
+            <h3 className="text-2xl font-extrabold text-white mb-2">Select Your Role</h3>
+            <p className="text-slate-400 text-sm mb-6">Please choose your account type to continue registration</p>
+            <div className="flex flex-col gap-3">
+              {[
+                { value: "customer", label: "Customer", desc: "Browse events & explore layouts", icon: "🎟️" },
+                { value: "vendor", label: "Vendor", desc: "Manage stalls & business profile", icon: "🏪" },
+                { value: "organizer", label: "Organizer", desc: "Create & coordinate events", icon: "🗂️" }
+              ].map((roleOption) => (
+                <button
+                  key={roleOption.value}
+                  onClick={() => handleRoleSelection(roleOption.value)}
+                  className="flex items-center gap-4 p-4 rounded-2xl border border-white/10 bg-white/[0.02] text-left hover:border-indigo-500 hover:bg-indigo-500/5 transition-all duration-200 cursor-pointer group"
+                >
+                  <span className="text-2xl">{roleOption.icon}</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-white group-hover:text-indigo-400 transition-colors">{roleOption.label}</p>
+                    <p className="text-xs text-slate-500 leading-tight mt-0.5">{roleOption.desc}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

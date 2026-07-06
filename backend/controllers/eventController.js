@@ -92,3 +92,100 @@ export const getEventById = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// PUT /api/events/:id
+export const updateEvent = async (req, res) => {
+  try {
+    const { name, description, date } = req.body;
+    const event = await Event.findById(req.params.id);
+    if (!event) {
+      return res.status(404).json({ success: false, message: 'Event not found.' });
+    }
+
+    if (name) event.name = name;
+    if (description !== undefined) event.description = description;
+    if (date !== undefined) event.date = date ? new Date(date) : null;
+
+    const bannerFile = req.files?.banner?.[0];
+    const floorMapFile = req.files?.floorMap?.[0];
+
+    const uploads = [];
+    if (bannerFile) {
+      uploads.push(streamUpload(bannerFile.buffer, 'eventpulse/banners').then(res => {
+        event.bannerImageUrl = res.secure_url;
+        event.bannerPublicId = res.public_id;
+      }));
+    }
+    if (floorMapFile) {
+      uploads.push(streamUpload(floorMapFile.buffer, 'eventpulse/floormaps').then(res => {
+        event.floorMapImageUrl = res.secure_url;
+        event.floorMapPublicId = res.public_id;
+      }));
+    }
+
+    if (uploads.length > 0) {
+      await Promise.all(uploads);
+    }
+
+    await event.save();
+    res.status(200).json({ success: true, data: event });
+  } catch (error) {
+    console.error('Update event error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+import Ticket from '../models/Ticket.js';
+import User from '../models/User.js';
+
+// POST /api/events/:id/purchase
+export const purchaseTicket = async (req, res) => {
+  try {
+    const { userId, tier, seat, price } = req.body;
+    const eventId = req.params.id;
+
+    if (!userId || !tier || !seat || !price) {
+      return res.status(400).json({ success: false, message: 'All purchase fields are required.' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    if (user.walletBalance < price) {
+      return res.status(400).json({ success: false, message: 'Insufficient wallet balance.' });
+    }
+
+    // Deduct balance
+    user.walletBalance -= price;
+    await user.save();
+
+    // Create ticket
+    const qrPayload = JSON.stringify({ userId, eventId, tier, seat, timestamp: Date.now() });
+    const ticket = await Ticket.create({
+      user: userId,
+      event: eventId,
+      tier,
+      seat,
+      price,
+      qrCodeData: qrPayload,
+      status: 'Active'
+    });
+
+    res.status(201).json({ success: true, ticket, walletBalance: user.walletBalance });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// GET /api/events/user/:userId/tickets
+export const getUserTickets = async (req, res) => {
+  try {
+    const tickets = await Ticket.find({ user: req.params.userId }).populate('event').sort({ createdAt: -1 });
+    res.status(200).json({ success: true, count: tickets.length, data: tickets });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
