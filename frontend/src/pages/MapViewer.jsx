@@ -876,7 +876,66 @@ export default function MapViewer({ eventId: propEventId }) {
             </div>
           )}
 
-          {/* EP-42/43 (Sachin & Mesanda): stall info card goes here */}
+          {/* ── Selected Stall Info Card (EP-43 — Mesanda) ───────────────── */}
+          {!isEditorMode && selectedStall && (
+            <div className="flex flex-col gap-3 p-3.5 bg-white/[0.03] border border-white/[0.08] rounded-xl animate-scale-in relative">
+
+              {/* Dismiss button — clears selection + removes orange glow on map */}
+              <button
+                onClick={() => setSelectedStall(null)}
+                title="Dismiss"
+                className="absolute top-2.5 right-2.5 w-5 h-5 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-slate-500 hover:text-white transition-all cursor-pointer"
+              >
+                <X className="w-3 h-3" />
+              </button>
+
+              {/* Category colour dot + label */}
+              <div className="flex items-center gap-2">
+                <span
+                  className="w-2.5 h-2.5 rounded-sm shrink-0"
+                  style={{
+                    background: (CATEGORY_STYLES[selectedStall.category] || DEFAULT_ZONE_STYLE).stroke,
+                    opacity: 0.9,
+                  }}
+                />
+                <span className="text-[0.6rem] font-bold text-slate-500 uppercase tracking-widest">
+                  {selectedStall.category}
+                </span>
+              </div>
+
+              {/* Zone name + ID */}
+              <div className="flex items-start gap-2">
+                <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-px" />
+                <div>
+                  <p className="text-sm font-bold text-slate-100 leading-snug">{selectedStall.name}</p>
+                  <p className="text-[0.62rem] text-slate-500 font-mono mt-0.5">{selectedStall.id}</p>
+                </div>
+              </div>
+
+              {/* Category tag row */}
+              <div className="flex items-center gap-1.5">
+                <Tag className="w-3 h-3 text-indigo-400 shrink-0" />
+                <span className="text-[0.65rem] text-slate-400">{selectedStall.category}</span>
+              </div>
+
+              {/* Placeholder panel for future vendor/booth details */}
+              <div className="rounded-lg bg-white/[0.02] border border-white/[0.05] px-3 py-2">
+                <p className="text-[0.62rem] text-slate-600 italic leading-relaxed">
+                  Additional booth details (vendor info, capacity, schedule) will appear here once linked.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ── Fallback hint — shown when no zone is selected ────────────── */}
+          {!isEditorMode && !selectedStall && (
+            <div className="flex flex-col items-center justify-center gap-2 py-6 text-slate-600">
+              <MapPin className="w-5 h-5 opacity-40" />
+              <p className="text-[0.7rem] text-center leading-relaxed">
+                Click any coloured zone on the floor plan to view its details.
+              </p>
+            </div>
+          )}
 
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-sm font-bold text-slate-50">Map Controls</h2>
