@@ -3,10 +3,8 @@ import jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
 import User from '../models/User.js';
 
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-
-const router = express.Router();
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const router = express.Router();
 
 const signToken = (id, role) =>
   jwt.sign({ id, role }, process.env.JWT_SECRET || 'eventpulse_secret', { expiresIn: '7d' });
@@ -47,63 +45,63 @@ router.post('/login', async (req, res) => {
   }
 });
 
-<<<<<<< HEAD
-// POST /api/auth/google
+// POST /api/auth/google  (access_token flow — used by frontend)
 router.post('/google', async (req, res) => {
   try {
     const { userInfo } = req.body;
     if (!userInfo?.email) return res.status(400).json({ message: 'Google user info is required.' });
 
     const { sub: googleId, email, name, picture } = userInfo;
-
     let user = await User.findOne({ email });
 
     if (!user) {
-=======
-// POST /api/auth/google-login
+      user = await User.create({
+        fullName: name,
+        email,
+        phone: 'N/A',
+        password: googleId + (process.env.JWT_SECRET || 'eventpulse_secret'),
+        googleId,
+        avatar: picture,
+        role: 'customer',
+      });
+    }
+
+    res.json({
+      token: signToken(user._id, user.role),
+      user: { id: user._id, fullName: user.fullName, email: user.email, role: user.role, avatar: picture },
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// POST /api/auth/google-login  (ID token flow)
 router.post('/google-login', async (req, res) => {
   try {
     const { credential } = req.body;
-    if (!credential) {
-      return res.status(400).json({ message: 'Credential token is required.' });
-    }
+    if (!credential) return res.status(400).json({ message: 'Credential token is required.' });
 
     const ticket = await client.verifyIdToken({
       idToken: credential,
       audience: process.env.GOOGLE_CLIENT_ID,
     });
 
-    const payload = ticket.getPayload();
-    const { email, name } = payload;
-
+    const { email, name } = ticket.getPayload();
     let user = await User.findOne({ email });
     let isNewUser = false;
 
     if (!user) {
       isNewUser = true;
-      const randomPassword = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
->>>>>>> 39e6a260d2af63b8793e7ee75a87215c390f4425
       user = await User.create({
         fullName: name,
         email,
         phone: 'N/A',
-<<<<<<< HEAD
-        password: googleId + (process.env.JWT_SECRET || 'eventpulse_secret'),
-        googleId,
-        avatar: picture,
+        password: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),
         role: 'customer',
-=======
-        password: randomPassword,
-        role: 'customer', // Temporarily defaults to customer, role selection updates this
->>>>>>> 39e6a260d2af63b8793e7ee75a87215c390f4425
       });
     }
 
     res.json({
-<<<<<<< HEAD
-      token: signToken(user._id, user.role),
-      user: { id: user._id, fullName: user.fullName, email: user.email, role: user.role, avatar: picture },
-=======
       isNewUser,
       token: signToken(user._id, user.role),
       user: { id: user._id, fullName: user.fullName, email: user.email, role: user.role },
@@ -117,14 +115,10 @@ router.post('/google-login', async (req, res) => {
 router.post('/google-set-role', async (req, res) => {
   try {
     const { userId, role } = req.body;
-    if (!userId || !role) {
-      return res.status(400).json({ message: 'UserId and role are required.' });
-    }
+    if (!userId || !role) return res.status(400).json({ message: 'UserId and role are required.' });
 
     const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found.' });
-    }
+    if (!user) return res.status(404).json({ message: 'User not found.' });
 
     user.role = role;
     await user.save();
@@ -132,7 +126,6 @@ router.post('/google-set-role', async (req, res) => {
     res.json({
       token: signToken(user._id, user.role),
       user: { id: user._id, fullName: user.fullName, email: user.email, role: user.role },
->>>>>>> 39e6a260d2af63b8793e7ee75a87215c390f4425
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
