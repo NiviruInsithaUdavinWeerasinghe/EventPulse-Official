@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import connectDB from './config/db.js';
 import eventRoutes from './routes/eventRoutes.js';
 import authRoutes from './routes/auth.js';
+import vendorRoutes from './routes/vendorRoutes.js';
 
 dotenv.config();
 
@@ -27,6 +28,7 @@ app.get('/health', (req, res) => {
 
 // API Routes (EP-22 - Niviru)
 app.use('/api/events', eventRoutes);
+app.use('/api/vendors', vendorRoutes);
 
 app.listen(PORT, () => {
   console.log(`EventPulse Official backend server running on port ${PORT}`);
