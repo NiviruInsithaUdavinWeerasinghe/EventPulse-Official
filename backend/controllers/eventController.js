@@ -1,6 +1,7 @@
 import { v2 as cloudinary } from 'cloudinary';
 import { Readable } from 'stream';
 import Event from '../models/Event.js';
+import VendorApplication from '../models/VendorApplication.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -184,6 +185,122 @@ export const getUserTickets = async (req, res) => {
   try {
     const tickets = await Ticket.find({ user: req.params.userId }).populate('event').sort({ createdAt: -1 });
     res.status(200).json({ success: true, count: tickets.length, data: tickets });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// PUT /api/events/:id/zones
+export const updateEventZones = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { zones, rawSvgContent } = req.body;
+    
+    const event = await Event.findById(id);
+    if (!event) {
+      return res.status(404).json({ success: false, message: 'Event not found.' });
+    }
+    
+    if (zones !== undefined) event.zones = zones;
+    if (rawSvgContent !== undefined) event.rawSvgContent = rawSvgContent;
+    
+    await event.save();
+    res.status(200).json({ success: true, data: event });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// POST /api/vendor-applications
+export const submitVendorApplication = async (req, res) => {
+  try {
+    const { eventId, vendorId, businessName, businessType, email, phone, description, requestedStall } = req.body;
+    
+    if (!eventId || !vendorId || !businessName || !businessType || !email || !phone || !description || !requestedStall) {
+      return res.status(400).json({ success: false, message: 'All application fields are required.' });
+    }
+    
+    const existingApproved = await VendorApplication.findOne({
+      eventId,
+      requestedStall,
+      status: 'Approved'
+    });
+    if (existingApproved) {
+      return res.status(400).json({ success: false, message: 'This stall has already been reserved and approved for another vendor.' });
+    }
+    
+    const application = await VendorApplication.create({
+      eventId,
+      vendorId,
+      businessName,
+      businessType,
+      email,
+      phone,
+      description,
+      requestedStall,
+      status: 'Pending'
+    });
+    
+    res.status(201).json({ success: true, data: application });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// GET /api/vendor-applications/event/:eventId
+export const getEventApplications = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const applications = await VendorApplication.find({ eventId })
+      .populate('vendorId', 'fullName email phone')
+      .sort({ createdAt: -1 });
+    res.status(200).json({ success: true, count: applications.length, data: applications });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// PUT /api/vendor-applications/:id/status
+export const updateApplicationStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    
+    if (!status || !['Pending', 'Approved', 'Rejected'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Valid status is required.' });
+    }
+    
+    const application = await VendorApplication.findById(id);
+    if (!application) {
+      return res.status(404).json({ success: false, message: 'Application not found.' });
+    }
+    
+    if (status === 'Approved') {
+      const existingApproved = await VendorApplication.findOne({
+        eventId: application.eventId,
+        requestedStall: application.requestedStall,
+        status: 'Approved',
+        _id: { $ne: id }
+      });
+      if (existingApproved) {
+        return res.status(400).json({ success: false, message: 'Another application for this stall is already approved.' });
+      }
+      
+      await VendorApplication.updateMany(
+        {
+          eventId: application.eventId,
+          requestedStall: application.requestedStall,
+          status: 'Pending',
+          _id: { $ne: id }
+        },
+        { status: 'Rejected' }
+      );
+    }
+    
+    application.status = status;
+    await application.save();
+    
+    res.status(200).json({ success: true, data: application });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
