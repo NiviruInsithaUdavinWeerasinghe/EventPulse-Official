@@ -97,6 +97,15 @@ export default function MapViewer({ eventId: propEventId }) {
 
   // EP-22: Polygon selector — tracks the currently highlighted zone
   const [selectedStall, setSelectedStall] = useState(null);
+  const [isSimulationMode, setIsSimulationMode] = useState(false);
+  const [activeNavigation, setActiveNavigation] = useState(null); // { id, name, center: { x, y } }
+  const [zoneCrowdData, setZoneCrowdData]       = useState({}); // { [zoneId]: { count, capacity, state: "low"|"moderate"|"high" } }
+  const [userPosition, setUserPosition]         = useState(null); // { x, y } in SVG coords
+  const [activeAlert, setActiveAlert]           = useState(null); // { zoneId, zoneName, recommendationId, recommendationName }
+  const [crowdParticles, setCrowdParticles]     = useState([]); // Array of { id, x, y }
+  const userDragRef                             = useRef(false);
+  const particlesRef                            = useRef([]);
+  const animationFrameIdRef                     = useRef(null);
 
 
 // ── EP-27/28/29/30: Search & Filter States ────────────────────────────────
@@ -178,6 +187,209 @@ export default function MapViewer({ eventId: propEventId }) {
       fetchApplications();
     }
   }, [eventId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // --- Crowd Telemetry Simulation Loop (EP-12) ---------------------------
+  useEffect(() => {
+    if (!isSimulationMode || !event?.zones || event.zones.length === 0) {
+      setCrowdParticles([]);
+      particlesRef.current = [];
+      if (animationFrameIdRef.current) cancelAnimationFrame(animationFrameIdRef.current);
+      return;
+    }
+    const initialParticles = [];
+    const zoneList = event.zones.filter(z => z.center);
+    if (zoneList.length === 0) return;
+    for (let i = 0; i < 150; i++) {
+      const startZone = zoneList[Math.floor(Math.random() * zoneList.length)];
+      const targetZone = zoneList[Math.floor(Math.random() * zoneList.length)];
+      const useSvgTarget = Math.random() > 0.4;
+      const targetX = useSvgTarget ? Math.random() * svgDimensions.w : targetZone.center.x + (Math.random() - 0.5) * 60;
+      const targetY = useSvgTarget ? Math.random() * svgDimensions.h : targetZone.center.y + (Math.random() - 0.5) * 60;
+      const x = startZone.center.x + (Math.random() - 0.5) * 60;
+      const y = startZone.center.y + (Math.random() - 0.5) * 60;
+      initialParticles.push({
+        id: i,
+        x,
+        y,
+        tx: targetX,
+        ty: targetY,
+
+        targetZoneId: targetZone.id,
+        speed: Math.random() * 0.18 + 0.12,
+        waitCounter: Math.floor(Math.random() * 200)
+      });
+    }
+    particlesRef.current = initialParticles;
+    setCrowdParticles(initialParticles.map(p => ({ id: p.id, x: p.x, y: p.y })));
+    const animate = () => {
+      const current = particlesRef.current.map(p => {
+        let newX = p.x;
+        let newY = p.y;
+        let newTx = p.tx;
+        let newTy = p.ty;
+        let newTargetZoneId = p.targetZoneId;
+        let newWait = p.waitCounter;
+        const dx = p.tx - p.x;
+        const dy = p.ty - p.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (newWait > 0) {
+          newWait--;
+          if (newWait % 40 === 0) {
+            const zoneObj = zoneList.find(z => z.id === p.targetZoneId);
+            if (zoneObj) {
+              newTx = zoneObj.center.x + (Math.random() - 0.5) * 40;
+              newTy = zoneObj.center.y + (Math.random() - 0.5) * 40;
+            }
+          }
+          if (dist > 1) {
+            newX += (dx / dist) * 0.1;
+            newY += (dy / dist) * 0.1;
+          }
+        } else if (dist > 2) {
+          newX += (dx / dist) * p.speed;
+          newY += (dy / dist) * p.speed;
+        } else {
+          newWait = Math.floor(Math.random() * 250) + 150;
+          const nextZone = zoneList[Math.floor(Math.random() * zoneList.length)];
+          const useSvgTarget = Math.random() > 0.35;
+          newTx = useSvgTarget ? Math.random() * svgDimensions.w : nextZone.center.x + (Math.random() - 0.5) * 60;
+          newTy = useSvgTarget ? Math.random() * svgDimensions.h : nextZone.center.y + (Math.random() - 0.5) * 60;
+          newTargetZoneId = useSvgTarget ? null : nextZone.id;
+
+
+          newTargetZoneId = nextZone.id;
+        }
+        return { ...p, x: newX, y: newY, tx: newTx, ty: newTy, targetZoneId: newTargetZoneId, waitCounter: newWait };
+      });
+      particlesRef.current = current;
+      setCrowdParticles(current.map(p => ({ id: p.id, x: p.x, y: p.y })));
+      const counts = {};
+      event.zones.forEach(z => { counts[z.id] = { count: 0, capacity: z.capacity || 12, state: "low" } });
+      current.forEach(p => {
+        event.zones.forEach(z => {
+          if (z.center) {
+            const dx = p.x - z.center.x;
+            const dy = p.y - z.center.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 32) {
+              counts[z.id].count++;
+            }
+          }
+        });
+      });
+      event.zones.forEach(z => {
+        const crowd = counts[z.id];
+        if (crowd) {
+          const ratio = crowd.count / crowd.capacity;
+          if (ratio >= 0.85) {
+            crowd.state = "high";
+          } else if (ratio >= 0.45) {
+            crowd.state = "moderate";
+          }
+        }
+      });
+      setZoneCrowdData(counts);
+      animationFrameIdRef.current = requestAnimationFrame(animate);
+    };
+    animationFrameIdRef.current = requestAnimationFrame(animate);
+    return () => {
+      if (animationFrameIdRef.current) cancelAnimationFrame(animationFrameIdRef.current);
+    };
+  }, [isSimulationMode, event]);
+
+  // --- Real-Time Live Navigation Arrival Detector (EP-13) -----------------
+  useEffect(() => {
+    if (!isSimulationMode || !activeNavigation || !userPosition) return;
+    
+    const dx = userPosition.x - activeNavigation.center.x;
+    const dy = userPosition.y - activeNavigation.center.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    // Trigger successful arrival when user drags pin within 38px of destination center
+    if (dist < 38) {
+      addToast(`?? Destination Reached! Welcome to ${activeNavigation.name}.`, "success");
+      setActiveNavigation(null);
+    }
+  }, [isSimulationMode, userPosition, activeNavigation]);
+
+  // --- Proximity Auto-Selection Sidebar Panel (EP-12/13) ------------------
+  useEffect(() => {
+    if (!isSimulationMode || !userPosition || !event?.zones || event.zones.length === 0) return;
+    
+    let closestZone = null;
+    let minDistance = 999999;
+    
+    event.zones.forEach(zone => {
+      if (zone.center) {
+        const dx = userPosition.x - zone.center.x;
+        const dy = userPosition.y - zone.center.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 80 && dist < minDistance) {
+          minDistance = dist;
+          closestZone = zone;
+        }
+      }
+    });
+    
+    if (closestZone) {
+      setSelectedStall({
+        id: closestZone.id,
+        name: closestZone.name || closestZone.id,
+        category: closestZone.category || "Uncategorised"
+      });
+    }
+  }, [isSimulationMode, userPosition, event]);
+
+  // --- Proximity & Adaptive Routing Detector (EP-13) ----------------------
+  useEffect(() => {
+    if (!isSimulationMode || !userPosition || !event?.zones) {
+      setActiveAlert(null);
+      return;
+    }
+    let activeCongestedZone = null;
+    let minDistance = 999999;
+    event.zones.forEach(zone => {
+      const crowd = zoneCrowdData[zone.id];
+      if (crowd && crowd.state === "high" && zone.center) {
+        const dx = userPosition.x - zone.center.x;
+        const dy = userPosition.y - zone.center.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 60 && dist < minDistance) {
+          minDistance = dist;
+          activeCongestedZone = zone;
+        }
+      }
+    });
+    if (activeCongestedZone) {
+      let recommendation = null;
+      let recMinDist = 999999;
+      event.zones.forEach(zone => {
+        const crowd = zoneCrowdData[zone.id];
+        if (crowd && crowd.state === "low" && zone.id !== activeCongestedZone.id && zone.center) {
+          const dx = activeCongestedZone.center.x - zone.center.x;
+          const dy = activeCongestedZone.center.y - zone.center.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < recMinDist) {
+            recMinDist = dist;
+            recommendation = zone;
+          }
+        }
+      });
+      if (recommendation) {
+        setActiveAlert({
+          zoneId: activeCongestedZone.id,
+          zoneName: activeCongestedZone.name || activeCongestedZone.id,
+          recommendationId: recommendation.id,
+          recommendationName: recommendation.name || recommendation.id,
+          recommendationCenter: recommendation.center
+        });
+      } else {
+        setActiveAlert(null);
+      }
+    } else {
+      setActiveAlert(null);
+    }
+  }, [isSimulationMode, userPosition, zoneCrowdData, event]);
 
   // ── EP-28: Backend search API call ──────────────────────────────────────
   const runSearch = useCallback(async (q, category) => {
@@ -402,20 +614,31 @@ export default function MapViewer({ eventId: propEventId }) {
       let fill = 'rgba(37, 99, 235, 0.2)';
       let stroke = '#3b82f6';
       
-      if (app) {
+      const crowd = zoneCrowdData[stall.id];
+      if (isSimulationMode && crowd) {
+        if (crowd.state === "high") {
+          fill = "rgba(239, 68, 68, 0.45)";
+          stroke = "#ef4444";
+        } else if (crowd.state === "moderate") {
+          fill = "rgba(245, 158, 11, 0.45)";
+          stroke = "#f59e0b";
+        } else {
+          fill = "rgba(16, 185, 129, 0.45)";
+          stroke = "#10b981";
+        }
+      } else if (app) {
         if (app.status === 'Approved') {
-          fill = 'rgba(239, 68, 68, 0.15)'; // Muted red
-          stroke = '#ef4444'; // Red
+          fill = 'rgba(239, 68, 68, 0.15)';
+          stroke = '#ef4444';
         } else if (app.status === 'Pending') {
-          fill = 'rgba(245, 158, 11, 0.15)'; // Muted amber
-          stroke = '#f59e0b'; // Amber
+          fill = 'rgba(245, 158, 11, 0.15)';
+          stroke = '#f59e0b';
         }
       } else {
         const catStyle = CATEGORY_STYLES[stall.category] || DEFAULT_ZONE_STYLE;
         fill = catStyle.fill;
         stroke = catStyle.stroke;
       }
-
       css += `
         #blueprint-wrapper [id="${stall.id}" i] {
           fill: ${fill} !important;
@@ -445,7 +668,7 @@ export default function MapViewer({ eventId: propEventId }) {
     }
 
     return css;
-  }, [event, selectedStall, stallApplicationMap]);
+  }, [event, selectedStall, stallApplicationMap, isSimulationMode, zoneCrowdData]);
 
   // Orange highlight for all shapes currently in the editor selection
   const selectedShapesStyles = useMemo(() => {
@@ -706,6 +929,121 @@ export default function MapViewer({ eventId: propEventId }) {
 
   // --- Helpers --------------------------------------------------------------
   // ─── Zoom helpers — all use refs, no stale-closure issues ─────────────────
+  // --- Obstacle-Avoiding Path Planner (EP-13) ---------------------------
+  // Calculates a multi-segment path to route around active booths/blocks
+  const getNavigationPath = useCallback((start, end) => {
+    if (!start || !end) return [];
+    const path = [start];
+    
+    // 1. Structural booths from event.zones
+    const savedObstacles = (event?.zones || []).filter(z => 
+      z.center && 
+      z.id !== activeNavigation?.id && 
+      (z.category === "Robotics" || z.category === "Cybersecurity" || z.category === "Artificial Intelligence" || z.category === "Biotechnology" || z.category === "Refreshments")
+    ).map(z => ({ x: z.center.x, y: z.center.y, r: 35 }));
+    
+    // 2. Scan DOM for unsaved blueprint layout shapes (.selectable-shape)
+    const unsavedObstacles = [];
+    try {
+      const wrapper = document.getElementById("blueprint-wrapper");
+      if (wrapper) {
+        const shapes = wrapper.querySelectorAll(".selectable-shape");
+        const savedIds = new Set((event?.zones || []).map(z => z.id.toLowerCase()));
+        
+        shapes.forEach(shape => {
+          const id = shape.getAttribute("id");
+          // If not in event.zones, it is an unsaved layout block obstacle
+          if (id && !savedIds.has(id.toLowerCase())) {
+            const tagName = shape.tagName.toLowerCase();
+            let cx = 0, cy = 0, r = 35;
+            
+            if (tagName === "rect") {
+              const x = parseFloat(shape.getAttribute("x") || 0);
+              const y = parseFloat(shape.getAttribute("y") || 0);
+              const w = parseFloat(shape.getAttribute("width") || 0);
+              const h = parseFloat(shape.getAttribute("height") || 0);
+              cx = x + w / 2;
+              cy = y + h / 2;
+              r = Math.max(w, h) / 2 + 10;
+            } else if (tagName === "circle") {
+              cx = parseFloat(shape.getAttribute("cx") || 0);
+              cy = parseFloat(shape.getAttribute("cy") || 0);
+              r = parseFloat(shape.getAttribute("r") || 0) + 10;
+            } else {
+              // Fallback to DOM Bounding Box
+              try {
+                const bbox = shape.getBBox();
+                cx = bbox.x + bbox.width / 2;
+                cy = bbox.y + bbox.height / 2;
+                r = Math.max(bbox.width, bbox.height) / 2 + 10;
+              } catch (e) {
+                return;
+              }
+            }
+            
+            if (cx > 0 && cy > 0) {
+              unsavedObstacles.push({ x: cx, y: cy, r: Math.min(r, 45) });
+            }
+          }
+        });
+      }
+    } catch (e) {
+      console.error("Failed to parse unsaved layout shapes:", e);
+    }
+    
+    const obstacles = [...savedObstacles, ...unsavedObstacles];
+    
+    const lineIntersectsCircle = (p1, p2, cx, cy, r) => {
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len === 0) return false;
+      const u = ((cx - p1.x) * dx + (cy - p1.y) * dy) / (len * len);
+      const clampU = Math.max(0, Math.min(1, u));
+      const closestX = p1.x + clampU * dx;
+      const closestY = p1.y + clampU * dy;
+      const dist = Math.sqrt((cx - closestX) ** 2 + (cy - closestY) ** 2);
+      return dist < r;
+    };
+    
+    const findIntersectingObstacle = (p1, p2) => {
+      for (const obs of obstacles) {
+        if (lineIntersectsCircle(p1, p2, obs.x, obs.y, obs.r)) {
+          return obs;
+        }
+      }
+      return null;
+    };
+    
+    const obs = findIntersectingObstacle(start, end);
+    if (obs) {
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      
+      if (len > 0) {
+        const nx = -dy / len;
+        const ny = dx / len;
+        
+        const detourX1 = obs.x + nx * (obs.r + 20);
+        const detourY1 = obs.y + ny * (obs.r + 20);
+        const detourX2 = obs.x - nx * (obs.r + 20);
+        const detourY2 = obs.y - ny * (obs.r + 20);
+        
+        const centerX = svgDimensions.w / 2;
+        const centerY = svgDimensions.h / 2;
+        
+        const cDist1 = Math.sqrt((detourX1 - centerX) ** 2 + (detourY1 - centerY) ** 2);
+        const cDist2 = Math.sqrt((detourX2 - centerX) ** 2 + (detourY2 - centerY) ** 2);
+        
+        const chosenDetour = cDist1 < cDist2 ? { x: detourX1, y: detourY1 } : { x: detourX2, y: detourY2 };
+        path.push(chosenDetour);
+      }
+    }
+    
+    path.push(end);
+    return path;
+  }, [event, activeNavigation, svgDimensions, clientSvgContent]);
   const applyZoom = useCallback((newScale, originX, originY) => {
     const clamped = Math.min(Math.max(newScale, 0.3), 5);
     const ratio   = clamped / scaleRef.current;
@@ -756,6 +1094,21 @@ export default function MapViewer({ eventId: propEventId }) {
 
   const handleMouseDown = (e) => {
     if (e.button !== 0) return;
+    if (isSimulationMode && userPosition) {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect) {
+        const svgX = (e.clientX - rect.left - panRef.current.x) / scaleRef.current;
+        const svgY = (e.clientY - rect.top  - panRef.current.y) / scaleRef.current;
+        const dx = svgX - userPosition.x;
+        const dy = svgY - userPosition.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 20) {
+          userDragRef.current = true;
+          e.preventDefault();
+          return;
+        }
+      }
+    }
     dragStartRef.current = {
       clientX: e.clientX, clientY: e.clientY,
       panX: panRef.current.x, panY: panRef.current.y,
@@ -766,7 +1119,15 @@ export default function MapViewer({ eventId: propEventId }) {
   };
 
   const handleMouseMove = (e) => {
-    // ── Icon drag takes priority over map pan ──────────────────────────────
+    if (isSimulationMode && userDragRef.current) {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect) {
+        const svgX = (e.clientX - rect.left - panRef.current.x) / scaleRef.current;
+        const svgY = (e.clientY - rect.top  - panRef.current.y) / scaleRef.current;
+        setUserPosition({ x: svgX, y: svgY });
+      }
+      return;
+    }
     if (iconDragRef.current) {
       const rect = containerRef.current?.getBoundingClientRect();
       if (rect) {
@@ -792,7 +1153,11 @@ export default function MapViewer({ eventId: propEventId }) {
     }
   };
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (e) => {
+    if (userDragRef.current) {
+      userDragRef.current = false;
+      return;
+    }
     if (iconDragRef.current) {
       const { zoneId } = iconDragRef.current;
       const pos = iconPositions[zoneId];
@@ -804,15 +1169,23 @@ export default function MapViewer({ eventId: propEventId }) {
     }
     if (!dragStartRef.current) return;
     if (!isDragActiveRef.current) {
-      // Short click — delegate to shape-selection logic
       const target = dragStartRef.current.target;
-      const tagName = target.tagName?.toLowerCase?.() || '';
-      const isSvgShape = ['path', 'rect', 'polygon', 'circle', 'ellipse'].includes(tagName);
+      if (isSimulationMode && (target === containerRef.current || target.classList?.contains("map-grid-bg"))) {
+        const rect = containerRef.current?.getBoundingClientRect();
+        if (rect) {
+          const svgX = (e.clientX - rect.left - panRef.current.x) / scaleRef.current;
+          const svgY = (e.clientY - rect.top  - panRef.current.y) / scaleRef.current;
+          setUserPosition({ x: svgX, y: svgY });
+        }
+        dragStartRef.current = null;
+        return;
+      }
+      const tagName = target.tagName?.toLowerCase?.() || "";
+      const isSvgShape = ["path", "rect", "polygon", "circle", "ellipse"].includes(tagName);
       if (isSvgShape) {
         if (isEditorMode) {
           handleEditorShapeClick(target);
         } else {
-          // Call handleMapClick from Niviru's code (or Sachin's handler)
           handleMapClick({ target });
         }
       }
@@ -820,7 +1193,6 @@ export default function MapViewer({ eventId: propEventId }) {
     dragStartRef.current  = null;
     isDragActiveRef.current = false;
   };
-
   const handleMouseLeave = () => {
     iconDragRef.current = null;
     if (isDragActiveRef.current) {
@@ -982,6 +1354,46 @@ export default function MapViewer({ eventId: propEventId }) {
             <button onClick={handleZoomIn} title="Zoom In"
               className="px-2 py-1.5 text-slate-400 hover:text-white hover:bg-white/10 transition-colors text-xs font-bold cursor-pointer">+</button>
           </div>
+          <button
+            onClick={() => {
+              const active = !isSimulationMode;
+              setIsSimulationMode(active);
+              if (active) {
+                // Try to find the coordinates of an Exit category landmark to place "ME" next to it
+                let exitX = svgDimensions.w - 50;
+                let exitY = svgDimensions.h - 50;
+                
+                // Read from local storage exit safety landmarks ep-icon-{eventId}-Exit if it exists
+                try {
+                  const exitPosData = localStorage.getItem(`ep-icon-${eventId}-Exit`);
+                  if (exitPosData) {
+                    const parsed = JSON.parse(exitPosData);
+                    if (parsed && typeof parsed.x === "number") {
+                      exitX = parsed.x;
+                      exitY = parsed.y + 35; // Positioned slightly below the exit icon
+                    }
+                  }
+                } catch (e) {
+                  // Fallback to default w - 50, h - 50 bounds
+                }
+                
+                setUserPosition({ x: exitX, y: exitY });
+                addToast("Simulation mode enabled! Drag 'ME' marker or click empty background to move.", "success");
+              } else {
+                setUserPosition(null);
+                setActiveAlert(null);
+                addToast("Simulation mode disabled.", "info");
+              }
+            }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              isSimulationMode
+                ? "bg-orange-600 hover:bg-orange-700 text-white shadow-lg shadow-orange-500/20 border border-orange-500"
+                : "bg-white/5 hover:bg-white/10 text-slate-350 border border-white/10"
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            {isSimulationMode ? "Disable Simulation" : "Enable Simulation"}
+          </button>
           <span className="bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[0.65rem] font-bold px-2.5 py-1 rounded-full tracking-widest uppercase">
             Interactive Plan Mode
           </span>
@@ -1026,6 +1438,86 @@ export default function MapViewer({ eventId: propEventId }) {
                     height={svgDimensions.h}
                     style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
                   >
+                    {/* EP-13 Live Dynamic Navigation Dash Path (Target Route Helper) */}
+                    {isSimulationMode && activeNavigation && userPosition && (() => {
+                      const points = getNavigationPath(userPosition, activeNavigation.center);
+                      const lines = [];
+                      for (let i = 0; i < points.length - 1; i++) {
+                        lines.push(
+                          <line
+                            key={`nav-seg-${i}`}
+                            x1={points[i].x}
+                            y1={points[i].y}
+                            x2={points[i+1].x}
+                            y2={points[i+1].y}
+                            stroke="#10b981"
+                            strokeWidth={3}
+                            strokeDasharray="6,6"
+                            opacity={0.88}
+                            style={{ filter: "drop-shadow(0 0 3px rgba(16,185,129,0.85))" }}
+                            className="animate-pulse"
+                          />
+                        );
+                      }
+                      return <g>{lines}</g>;
+                    })()}
+
+                    {/* EP-12: Live Crowd Particles (Attendees Walking) */}
+                    {isSimulationMode && crowdParticles.map(p => (
+                      <circle
+                        key={`particle-${p.id}`}
+                        cx={p.x}
+                        cy={p.y}
+                        r={3.8}
+                        fill="#a5b4fc"
+                        opacity={0.88}
+                        style={{ filter: "drop-shadow(0 0 1.5px rgba(165,180,252,0.8))" }}
+                      />
+                    ))}
+
+                    {/* EP-13 User marker rendering */}
+                    {isSimulationMode && userPosition && (
+                      <g
+                        style={{ pointerEvents: "all", cursor: "grab" }}
+                        className="group"
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          userDragRef.current = true;
+                        }}
+                      >
+                        <circle
+                          cx={userPosition.x}
+                          cy={userPosition.y}
+                          r={20}
+                          fill="none"
+                          stroke="#3b82f6"
+                          strokeWidth={2}
+                          className="animate-pulse"
+                          style={{ transformOrigin: `${userPosition.x}px ${userPosition.y}px` }}
+                        />
+                        <circle
+                          cx={userPosition.x}
+                          cy={userPosition.y}
+                          r={12}
+                          fill="#2563eb"
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          style={{ filter: "drop-shadow(0 4px 6px rgba(0,0,0,0.3))" }}
+                        />
+                        <foreignObject
+                          x={userPosition.x - 7}
+                          y={userPosition.y - 7}
+                          width={14}
+                          height={14}
+                          style={{ pointerEvents: "none" }}
+                        >
+                          <div xmlns="http://www.w3.org/1999/xhtml" style={{ display: "flex", alignItems: "center", justify: "center", width: "100%", height: "100%" }}>
+                            <span style={{ fontSize: "8px", fontWeight: "bold", color: "white", fontFamily: "sans-serif" }}>ME</span>
+                          </div>
+                        </foreignObject>
+                      </g>
+                    )}
+
                     {Object.entries(CATEGORY_ICON_MAP).map(([category, { Icon, color }], index) => {
                       const iconDefaults = [
                         { xFrac: 0.10, yFrac: 0.08 },
@@ -1298,6 +1790,38 @@ export default function MapViewer({ eventId: propEventId }) {
                     <p className="text-[0.62rem] text-slate-550 font-mono mt-0.5">{selectedStall.id}</p>
                   </div>
                 </div>
+
+                {/* EP-12: Simulation Live Crowd Density Telemetry Display */}
+                {isSimulationMode && zoneCrowdData[selectedStall.id] && (() => {
+                  const crowd = zoneCrowdData[selectedStall.id];
+                  const ratio = crowd.count / crowd.capacity;
+                  const isRed = ratio >= 0.8;
+                  const isYellow = ratio >= 0.5 && ratio < 0.8;
+                  const colorClass = isRed ? "text-rose-400 border-rose-500/25 bg-rose-500/5" : isYellow ? "text-amber-400 border-amber-500/25 bg-amber-500/5" : "text-emerald-400 border-emerald-500/25 bg-emerald-500/5";
+                  const barColor = isRed ? "bg-rose-500" : isYellow ? "bg-amber-500" : "bg-emerald-500";
+                  return (
+                    <div className={`rounded-lg border px-3 py-2.5 space-y-1.5 ${colorClass}`}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[0.62rem] font-extrabold uppercase tracking-widest">
+                          Simulated Crowd Density
+                        </span>
+                        <span className="text-[0.65rem] font-bold px-2 py-0.5 rounded bg-white/5 uppercase">
+                          {crowd.state}
+                        </span>
+                      </div>
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-lg font-black tracking-tight">{crowd.count}</span>
+                        <span className="text-[0.65rem] text-slate-500 font-bold uppercase">/ {crowd.capacity} Capacity</span>
+                      </div>
+                      <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full ${barColor}`} 
+                          style={{ width: `${Math.min(ratio * 100, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Category tag row */}
                 <div className="flex items-center gap-1.5">
@@ -1589,7 +2113,59 @@ export default function MapViewer({ eventId: propEventId }) {
       )}
 
       {/* GPU-accelerated toast notifications */}
-      <div className="fixed top-4 right-4 flex flex-col gap-2 z-[200] pointer-events-none" aria-live="polite">
+      <div className="fixed top-4 right-4 flex flex-col gap-2.5 z-[200] pointer-events-none" aria-live="polite">
+        {/* EP-13: Congestion Adaptive Routing Toast Alert Banner (Smooth Hardware Accelerated Transitions) */}
+        {isSimulationMode && activeAlert && (
+          <div
+            className="pointer-events-auto flex items-start gap-3 p-4 rounded-xl shadow-2xl border bg-rose-950/95 border-rose-500/30 text-rose-100 text-xs leading-snug max-w-[22rem]"
+            style={{
+              animation: "toastSlideIn 0.38s cubic-bezier(0.16, 1, 0.3, 1) both",
+              willChange: "transform, opacity",
+              transform: "translate3d(0, 0, 0)",
+              backfaceVisibility: "hidden"
+            }}
+          >
+            <span className="text-sm shrink-0 mt-0.5">??</span>
+            <div className="flex-1 space-y-2">
+              <div>
+                <h4 className="font-extrabold text-rose-200 uppercase tracking-wider text-[0.62rem]">Congestion Warning</h4>
+                <p className="text-[0.68rem] text-rose-300 font-medium leading-normal mt-0.5">
+                  Zone <strong>{activeAlert.zoneName}</strong> is overcrowded. 
+                  We suggest routing to nearby clear zone <strong>{activeAlert.recommendationName}</strong>.
+                </p>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => {
+                    if (activeAlert.recommendationCenter) {
+                      panToStall(activeAlert.recommendationCenter);
+                      setSelectedStall({
+                        id: activeAlert.recommendationId,
+                        name: activeAlert.recommendationName,
+                        category: "Alternative Route Suggestion"
+                      });
+                      setActiveNavigation({
+                        id: activeAlert.recommendationId,
+                        name: activeAlert.recommendationName,
+                        center: activeAlert.recommendationCenter
+                      });
+                      addToast("Live Navigation Path active! Follow the dotted line.", "info");
+                      setSelectedStall({
+                        id: activeAlert.recommendationId,
+                        name: activeAlert.recommendationName,
+                        category: "Alternative Route Suggestion"
+                      });
+                      addToast("Panning to alternative route...", "success");
+                    }
+                  }}
+                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[0.6rem] rounded-lg transition-colors cursor-pointer shadow-sm"
+                >
+                  Reroute / Pan to Zone
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {toasts.map(toast => (
           <div key={toast.id}
             className={`pointer-events-auto flex items-start gap-3 pl-4 pr-3 py-3 rounded-xl shadow-2xl border backdrop-blur-md text-xs font-medium max-w-[22rem] leading-snug

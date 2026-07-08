@@ -119,8 +119,10 @@ export const updateEvent = async (req, res) => {
     }
     if (floorMapFile) {
       uploads.push(streamUpload(floorMapFile.buffer, 'eventpulse/floormaps').then(res => {
-        event.floorMapImageUrl = res.secure_url;
+        event.floorMapUrl = res.secure_url;      // fix: was floorMapImageUrl — MapViewer reads floorMapUrl
         event.floorMapPublicId = res.public_id;
+        event.rawSvgContent = null;              // fix: clear cached SVG so MapViewer fetches the new file
+        event.zones = [];                        // clear old zone mappings — they no longer match the new SVG
       }));
     }
 
