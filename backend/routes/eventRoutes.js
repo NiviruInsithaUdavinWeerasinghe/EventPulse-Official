@@ -12,6 +12,7 @@ import {
   getEventApplications,
   updateApplicationStatus
 } from '../controllers/eventController.js';
+import { searchEventZones } from '../controllers/searchController.js';
 
 const router = express.Router();
 
@@ -27,5 +28,6 @@ router.put('/:id/zones', updateEventZones);
 router.post('/applications/submit', submitVendorApplication);
 router.get('/applications/event/:eventId', getEventApplications);
 router.put('/applications/:id/status', updateApplicationStatus);
+router.get('/:id/search', searchEventZones);
 
 export default router;
