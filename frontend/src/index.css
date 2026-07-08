@@ -183,3 +183,35 @@
   stroke: #3b82f6 !important;
   stroke-width: 2px !important;
 }
+
+/* ── EP-45: Distinctive flashing location marker ───────────────────────── */
+.ep-flash-marker {
+  transform: translate(-50%, -100%);
+}
+
+.ep-marker-pin {
+  animation: epMarkerFlash 0.9s ease-in-out infinite;
+  filter: drop-shadow(0 0 8px rgba(244, 63, 94, 0.7));
+}
+
+.ep-marker-ring {
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 26px;
+  height: 26px;
+  border: 2px solid rgba(244, 63, 94, 0.8);
+  border-radius: 9999px;
+  transform: translateX(-50%) scaleY(0.45);
+  animation: epMarkerRing 1.2s ease-out infinite;
+}
+
+@keyframes epMarkerFlash {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.35; transform: scale(1.18); }
+}
+
+@keyframes epMarkerRing {
+  0%   { opacity: 0.9; transform: translateX(-50%) scaleY(0.45) scale(0.4); }
+  100% { opacity: 0;   transform: translateX(-50%) scaleY(0.45) scale(2.2); }
+}

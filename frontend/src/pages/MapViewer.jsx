@@ -99,6 +99,9 @@ export default function MapViewer({ eventId: propEventId }) {
   const [autocompleteList, setAutocompleteList] = useState([]);
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const searchRef = useRef(null);
+  // ── EP-41/45/46: Auto-pan & flashing marker states ────────────────────────
+  const [flashMarker, setFlashMarker] = useState(null); // { x, y } in SVG coords
+  const panAnimRef = useRef(null);
 
   // Prefill vendor form when a vacant stall is clicked
   useEffect(() => {
@@ -210,6 +213,42 @@ export default function MapViewer({ eventId: propEventId }) {
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  // ── EP-41: Smooth auto-pan transition to center viewport on a stall ──────
+  const panToStall = useCallback((center) => {
+    if (!center || !containerRef.current) return;
+    setFlashMarker(null); // EP-46: hide any existing marker during the pan
+    if (panAnimRef.current) cancelAnimationFrame(panAnimRef.current);
+
+    const c = containerRef.current;
+    const targetPan = {
+      x: c.clientWidth  / 2 - center.x * scaleRef.current,
+      y: c.clientHeight / 2 - center.y * scaleRef.current,
+    };
+    const startPan  = { ...panRef.current };
+    const duration  = 650;
+    const startTime = performance.now();
+    const easeInOutCubic = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+    const step = (now) => {
+      const progress = Math.min((now - startTime) / duration, 1);
+      const eased = easeInOutCubic(progress);
+      const newPan = {
+        x: startPan.x + (targetPan.x - startPan.x) * eased,
+        y: startPan.y + (targetPan.y - startPan.y) * eased,
+      };
+      panRef.current = newPan;
+      setPan(newPan);
+      if (progress < 1) {
+        panAnimRef.current = requestAnimationFrame(step);
+      } else {
+        // ── EP-46: trigger the flashing marker only after the pan completes ──
+        setFlashMarker({ x: center.x, y: center.y });
+        setTimeout(() => setFlashMarker(null), 4000);
+      }
+    };
+    panAnimRef.current = requestAnimationFrame(step);
   }, []);
 
   // ── EP-29: active zones filtered by search results ───────────────────────
@@ -940,6 +979,16 @@ export default function MapViewer({ eventId: propEventId }) {
                   draggable={false}
                 />
               )}
+              {/* ── EP-45/46: Flashing location marker ── */}
+              {flashMarker && (
+                <div
+                  className="ep-flash-marker"
+                  style={{ position: 'absolute', left: flashMarker.x + 24, top: flashMarker.y + 24, zIndex: 30, pointerEvents: 'none' }}
+                >
+                  <div className="ep-marker-ring" />
+                  <MapPin className="ep-marker-pin w-8 h-8 text-rose-500" fill="rgba(244,63,94,0.35)" strokeWidth={2.5} />
+                </div>
+              )}
             </div>
           </div>
 
@@ -1031,7 +1080,7 @@ export default function MapViewer({ eventId: propEventId }) {
               {searchResults !== null && searchResults.length > 0 && (
                 <div className="flex flex-col gap-1 max-h-40 overflow-y-auto pr-1">
                   {searchResults.map(zone => (
-                    <button key={zone.id} onClick={() => setSelectedStall({ id: zone.id, name: zone.name||zone.id, category: zone.category||'Uncategorised', center: zone.center||null })}
+                    <button key={zone.id} onClick={() => { setSelectedStall({ id: zone.id, name: zone.name||zone.id, category: zone.category||'Uncategorised', center: zone.center||null }); if (zone.center) panToStall(zone.center); }}
                       className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.05] hover:border-indigo-500/30 transition text-left cursor-pointer">
                       <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: (CATEGORY_STYLES[zone.category]||DEFAULT_ZONE_STYLE).stroke }} />
                       <div className="min-w-0 flex-1">
