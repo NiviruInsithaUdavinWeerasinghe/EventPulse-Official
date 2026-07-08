@@ -14,7 +14,7 @@ export default function VendorPortal() {
       title: 'Event registration & stall selection',
       desc: 'Browse upcoming events, register your presence, and choose your stall position on the interactive floorplan.',
       label: 'Go to events',
-      route: '/vendor/events',
+      route: '/events',
       color: 'indigo',
     },
     {
