@@ -52,8 +52,8 @@ export default function MapViewer({ eventId: propEventId }) {
   const navigate = useNavigate();
 
   const userRole = useMemo(() => getRoleFromToken(), []);
-  // isEditorMode kept so teammates can plug in without restructuring
-  const isEditorMode = userRole === 'vendor'; // eslint-disable-line no-unused-vars
+  // isEditorMode checks for organizer/operator role instead of vendor
+  const isEditorMode = userRole === 'organizer' || userRole === 'operator';
 
   // ─── Editor States (EP-39 / EP-86) ────────────────────────────────────────
   const [selectedShapes, setSelectedShapes] = useState([]); // [{ id, center }]
@@ -61,6 +61,19 @@ export default function MapViewer({ eventId: propEventId }) {
   const [batchTagData, setBatchTagData]     = useState({ prefix: '', startNum: '1', commonTitle: 'Booth', category: 'Cybersecurity' });
   const [singleTagData, setSingleTagData]   = useState({ id: '', name: '', category: 'Cybersecurity' });
   const [isSaving, setIsSaving]             = useState(false);
+
+  // ─── Vendor Application States ───────────────────────────────────────────
+  const [applications, setApplications] = useState([]);
+  const [vendorForm, setVendorForm] = useState({ businessName: '', businessType: '', email: '', phone: '', description: '' });
+  const [isSubmittingApp, setIsSubmittingApp] = useState(false);
+
+  const loggedInUser = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem('user')) || {};
+    } catch {
+      return {};
+    }
+  }, []);
 
   // ─── Toast (shared utility — keep if not already present) ─────────────────
   const [toasts, setToasts] = useState([]);
@@ -77,6 +90,19 @@ export default function MapViewer({ eventId: propEventId }) {
 
   // EP-22: Polygon selector — tracks the currently highlighted zone
   const [selectedStall, setSelectedStall] = useState(null);
+
+  // Prefill vendor form when a vacant stall is clicked
+  useEffect(() => {
+    if (selectedStall) {
+      setVendorForm({
+        businessName: loggedInUser.fullName || '',
+        businessType: '',
+        email: loggedInUser.email || '',
+        phone: loggedInUser.phone || '',
+        description: ''
+      });
+    }
+  }, [selectedStall, loggedInUser]);
 
   // --- SVG States -----------------------------------------------------------
   const [clientSvgContent, setClientSvgContent] = useState(null);
@@ -111,8 +137,23 @@ export default function MapViewer({ eventId: propEventId }) {
     }
   };
 
+  const fetchApplications = async () => {
+    try {
+      const res = await fetch(`/api/events/applications/event/${eventId}`);
+      const data = await res.json();
+      if (data.success) {
+        setApplications(data.data);
+      }
+    } catch (err) {
+      console.error('Error fetching applications:', err);
+    }
+  };
+
   useEffect(() => {
-    if (eventId) fetchEvent();
+    if (eventId) {
+      fetchEvent();
+      fetchApplications();
+    }
   }, [eventId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- Pre-process SVG (EP-22: inject selectable-shape class on every polygon)
@@ -214,13 +255,41 @@ export default function MapViewer({ eventId: propEventId }) {
     return () => cancelAnimationFrame(raf);
   }, [clientSvgContent, svgDimensions]);
 
+  const stallApplicationMap = useMemo(() => {
+    const map = {};
+    applications.forEach(app => {
+      const existing = map[app.requestedStall.toLowerCase()];
+      if (!existing || (existing.status === 'Pending' && app.status === 'Approved')) {
+        map[app.requestedStall.toLowerCase()] = app;
+      }
+    });
+    return map;
+  }, [applications]);
+
   // --- Zone colour + selection styles (EP-22: Visual Block Distinction) ------
   const attendeeStyles = useMemo(() => {
     if (!event?.zones) return '';
     let css = '';
 
     event.zones.forEach(stall => {
-      const { fill, stroke } = CATEGORY_STYLES[stall.category] || DEFAULT_ZONE_STYLE;
+      const app = stallApplicationMap[stall.id.toLowerCase()];
+      let fill = 'rgba(37, 99, 235, 0.2)';
+      let stroke = '#3b82f6';
+      
+      if (app) {
+        if (app.status === 'Approved') {
+          fill = 'rgba(239, 68, 68, 0.15)'; // Muted red
+          stroke = '#ef4444'; // Red
+        } else if (app.status === 'Pending') {
+          fill = 'rgba(245, 158, 11, 0.15)'; // Muted amber
+          stroke = '#f59e0b'; // Amber
+        }
+      } else {
+        const catStyle = CATEGORY_STYLES[stall.category] || DEFAULT_ZONE_STYLE;
+        fill = catStyle.fill;
+        stroke = catStyle.stroke;
+      }
+
       css += `
         #blueprint-wrapper [id="${stall.id}" i] {
           fill: ${fill} !important;
@@ -250,7 +319,7 @@ export default function MapViewer({ eventId: propEventId }) {
     }
 
     return css;
-  }, [event, selectedStall]);
+  }, [event, selectedStall, stallApplicationMap]);
 
   // Orange highlight for all shapes currently in the editor selection
   const selectedShapesStyles = useMemo(() => {
@@ -418,6 +487,41 @@ export default function MapViewer({ eventId: propEventId }) {
       });
       if (res.ok) await fetchEvent();
     } catch (err) { console.error(err); }
+  };
+
+  const handleVendorSubmitApplication = async (e) => {
+    e.preventDefault();
+    if (!selectedStall || !loggedInUser.id) return;
+    
+    setIsSubmittingApp(true);
+    try {
+      const res = await fetch('/api/vendors/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId,
+          vendorId: loggedInUser.id,
+          businessName: vendorForm.businessName,
+          businessType: vendorForm.businessType,
+          email: vendorForm.email,
+          phone: vendorForm.phone,
+          description: vendorForm.description,
+          requestedStall: selectedStall.id
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        addToast('Application submitted successfully!', 'success');
+        await fetchApplications();
+      } else {
+        addToast(data.message || 'Failed to submit application.', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      addToast('Network error submitting application.', 'error');
+    } finally {
+      setIsSubmittingApp(false);
+    }
   };
 
   // EP-42: Enhanced shape click — triggers informational callback for zones
@@ -877,55 +981,201 @@ export default function MapViewer({ eventId: propEventId }) {
           )}
 
           {/* ── Selected Stall Info Card (EP-43 — Mesanda) ───────────────── */}
-          {!isEditorMode && selectedStall && (
-            <div className="flex flex-col gap-3 p-3.5 bg-white/[0.03] border border-white/[0.08] rounded-xl animate-scale-in relative">
+          {!isEditorMode && selectedStall && (() => {
+            const stallApp = stallApplicationMap[selectedStall.id.toLowerCase()];
+            const isVendor = userRole === 'vendor';
+            
+            const myApp = applications.find(app => 
+              app.requestedStall.toLowerCase() === selectedStall.id.toLowerCase() && 
+              (app.vendorId?._id === loggedInUser.id || app.vendorId === loggedInUser.id)
+            );
 
-              {/* Dismiss button — clears selection + removes orange glow on map */}
-              <button
-                onClick={() => setSelectedStall(null)}
-                title="Dismiss"
-                className="absolute top-2.5 right-2.5 w-5 h-5 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-slate-500 hover:text-white transition-all cursor-pointer"
-              >
-                <X className="w-3 h-3" />
-              </button>
+            return (
+              <div className="flex flex-col gap-3.5 p-4 bg-white/[0.03] border border-white/[0.08] rounded-xl animate-scale-in relative">
+                {/* Dismiss button — clears selection + removes orange glow on map */}
+                <button
+                  onClick={() => setSelectedStall(null)}
+                  title="Dismiss"
+                  className="absolute top-2.5 right-2.5 w-5 h-5 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-slate-500 hover:text-white transition-all cursor-pointer"
+                >
+                  <X className="w-3 h-3" />
+                </button>
 
-              {/* Category colour dot + label */}
-              <div className="flex items-center gap-2">
-                <span
-                  className="w-2.5 h-2.5 rounded-sm shrink-0"
-                  style={{
-                    background: (CATEGORY_STYLES[selectedStall.category] || DEFAULT_ZONE_STYLE).stroke,
-                    opacity: 0.9,
-                  }}
-                />
-                <span className="text-[0.6rem] font-bold text-slate-500 uppercase tracking-widest">
-                  {selectedStall.category}
-                </span>
-              </div>
-
-              {/* Zone name + ID */}
-              <div className="flex items-start gap-2">
-                <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-px" />
-                <div>
-                  <p className="text-sm font-bold text-slate-100 leading-snug">{selectedStall.name}</p>
-                  <p className="text-[0.62rem] text-slate-500 font-mono mt-0.5">{selectedStall.id}</p>
+                {/* Category colour dot + label */}
+                <div className="flex items-center gap-2">
+                  <span
+                    className="w-2.5 h-2.5 rounded-sm shrink-0"
+                    style={{
+                      background: (CATEGORY_STYLES[selectedStall.category] || DEFAULT_ZONE_STYLE).stroke,
+                      opacity: 0.9,
+                    }}
+                  />
+                  <span className="text-[0.6rem] font-bold text-slate-500 uppercase tracking-widest">
+                    {selectedStall.category}
+                  </span>
                 </div>
-              </div>
 
-              {/* Category tag row */}
-              <div className="flex items-center gap-1.5">
-                <Tag className="w-3 h-3 text-indigo-400 shrink-0" />
-                <span className="text-[0.65rem] text-slate-400">{selectedStall.category}</span>
-              </div>
+                {/* Zone name + ID */}
+                <div className="flex items-start gap-2">
+                  <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-px" />
+                  <div>
+                    <p className="text-sm font-bold text-slate-100 leading-snug">{selectedStall.name}</p>
+                    <p className="text-[0.62rem] text-slate-550 font-mono mt-0.5">{selectedStall.id}</p>
+                  </div>
+                </div>
 
-              {/* Placeholder panel for future vendor/booth details */}
-              <div className="rounded-lg bg-white/[0.02] border border-white/[0.05] px-3 py-2">
-                <p className="text-[0.62rem] text-slate-600 italic leading-relaxed">
-                  Additional booth details (vendor info, capacity, schedule) will appear here once linked.
-                </p>
+                {/* Category tag row */}
+                <div className="flex items-center gap-1.5">
+                  <Tag className="w-3 h-3 text-indigo-400 shrink-0" />
+                  <span className="text-[0.65rem] text-slate-400">{selectedStall.category}</span>
+                </div>
+
+                {/* Application status / display workflows */}
+                {stallApp && stallApp.status === 'Approved' ? (
+                  <div className="rounded-lg bg-emerald-500/5 border border-emerald-500/10 px-3 py-2.5 mt-1 space-y-2">
+                    <p className="text-[0.65rem] font-bold text-emerald-400 uppercase tracking-wider">
+                      Stall Occupied / Approved
+                    </p>
+                    <div className="space-y-1">
+                      <p className="text-[0.7rem] text-slate-350 font-bold leading-tight">
+                        {stallApp.businessName}
+                      </p>
+                      <p className="text-[0.62rem] text-slate-550 uppercase font-semibold">
+                        Sector: {stallApp.businessType}
+                      </p>
+                      <p className="text-[0.62rem] text-slate-500 italic">
+                        "{stallApp.description}"
+                      </p>
+                    </div>
+                  </div>
+                ) : myApp ? (
+                  <div className={`rounded-lg px-3 py-2.5 mt-1 space-y-2 border ${
+                    myApp.status === 'Rejected' 
+                      ? 'bg-rose-500/5 border-rose-500/15' 
+                      : 'bg-amber-500/5 border-amber-500/15'
+                  }`}>
+                    <p className={`text-[0.65rem] font-bold uppercase tracking-wider ${
+                      myApp.status === 'Rejected' ? 'text-rose-400' : 'text-amber-400'
+                    }`}>
+                      Your Application: {myApp.status}
+                    </p>
+                    <div className="space-y-1 text-[0.68rem] text-slate-350 font-semibold">
+                      <p><span className="text-slate-500">Business:</span> {myApp.businessName}</p>
+                      <p><span className="text-slate-500">Type:</span> {myApp.businessType}</p>
+                      <p className="text-[0.62rem] text-slate-400 italic">"{myApp.description}"</p>
+                    </div>
+                  </div>
+                ) : isVendor ? (
+                  <form onSubmit={handleVendorSubmitApplication} className="flex flex-col gap-3 mt-1">
+                    <div className="h-px bg-white/5 my-1" />
+                    <p className="text-[0.68rem] text-slate-400 leading-relaxed font-semibold">
+                      Stall is vacant. Submit your layout-bound business application below.
+                    </p>
+                    
+                    {/* Operator assigned Category Warning / Detail */}
+                    <div className="bg-indigo-500/5 border border-indigo-500/10 rounded-lg p-2 flex flex-col gap-0.5">
+                      <span className="text-[0.58rem] text-slate-500 uppercase font-bold tracking-widest">
+                        Required Category (Set by Operator)
+                      </span>
+                      <span className="text-xs font-bold text-indigo-400">
+                        {selectedStall.category}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div>
+                        <label className="text-[0.55rem] text-slate-400 uppercase font-bold tracking-wider block mb-0.5">
+                          Business Name
+                        </label>
+                        <input
+                          required
+                          type="text"
+                          placeholder="e.g. Acme Tech Solutions"
+                          value={vendorForm.businessName}
+                          onChange={e => setVendorForm({ ...vendorForm, businessName: e.target.value })}
+                          className="w-full bg-white/[0.02] border border-white/8 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 focus:border-amber-500 focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[0.55rem] text-slate-400 uppercase font-bold tracking-wider block mb-0.5">
+                          Business Sector / Type
+                        </label>
+                        <input
+                          required
+                          type="text"
+                          placeholder="e.g. Cybersecurity Software"
+                          value={vendorForm.businessType}
+                          onChange={e => setVendorForm({ ...vendorForm, businessType: e.target.value })}
+                          className="w-full bg-white/[0.02] border border-white/8 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 focus:border-amber-500 focus:outline-none"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[0.55rem] text-slate-400 uppercase font-bold tracking-wider block mb-0.5">
+                            Contact Email
+                          </label>
+                          <input
+                            required
+                            type="email"
+                            placeholder="mail@business.com"
+                            value={vendorForm.email}
+                            onChange={e => setVendorForm({ ...vendorForm, email: e.target.value })}
+                            className="w-full bg-white/[0.02] border border-white/8 rounded-lg px-2 py-1.5 text-xs text-slate-100 focus:border-amber-500 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[0.55rem] text-slate-400 uppercase font-bold tracking-wider block mb-0.5">
+                            Contact Phone
+                          </label>
+                          <input
+                            required
+                            type="text"
+                            placeholder="+1 (555) 000-0000"
+                            value={vendorForm.phone}
+                            onChange={e => setVendorForm({ ...vendorForm, phone: e.target.value })}
+                            className="w-full bg-white/[0.02] border border-white/8 rounded-lg px-2 py-1.5 text-xs text-slate-100 focus:border-amber-500 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[0.55rem] text-slate-400 uppercase font-bold tracking-wider block mb-0.5">
+                          Business Description
+                        </label>
+                        <textarea
+                          required
+                          rows="3"
+                          placeholder="Briefly describe what you will exhibit..."
+                          value={vendorForm.description}
+                          onChange={e => setVendorForm({ ...vendorForm, description: e.target.value })}
+                          className="w-full bg-white/[0.02] border border-white/8 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 focus:border-amber-500 focus:outline-none resize-none"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isSubmittingApp}
+                      className="w-full py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-lg text-xs font-semibold shadow transition-all cursor-pointer mt-1"
+                    >
+                      {isSubmittingApp ? 'Submitting...' : 'Submit Stall Application'}
+                    </button>
+                  </form>
+                ) : (
+                  <div className="rounded-lg bg-white/[0.02] border border-white/[0.05] px-3 py-2.5 mt-1 space-y-1">
+                    <p className="text-[0.62rem] text-slate-550 uppercase font-bold tracking-wider">
+                      Stall Status
+                    </p>
+                    <p className="text-[0.7rem] text-slate-350 font-semibold italic">
+                      Vacant. Log in as a Vendor to submit an application for this stall.
+                    </p>
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* ── Fallback hint — shown when no zone is selected ────────────── */}
           {!isEditorMode && !selectedStall && (
