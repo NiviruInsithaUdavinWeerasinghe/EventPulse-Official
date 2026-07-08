@@ -72,6 +72,7 @@ export default function Login() {
       });
       const data = await res.json();
       if (!res.ok) return setError(data.message || "Setting role failed.");
+
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
       navigate("/dashboard");
@@ -84,6 +85,7 @@ export default function Login() {
 
   return (
     <div className="w-full max-w-[440px] px-8 py-10 rounded-3xl border border-white/10 bg-white/[0.02] shadow-[0_20px_50px_rgba(0,0,0,0.5)] backdrop-blur-xl relative overflow-hidden transition-all duration-300">
+      {/* Background radial soft light overlay */}
       <div className="absolute -top-24 -left-24 w-48 h-48 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
       <div className="absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-purple-500/10 blur-3xl pointer-events-none" />
 
@@ -91,13 +93,20 @@ export default function Login() {
         <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 mb-4">
           <Sparkles className="text-indigo-400" size={22} />
         </div>
-        <h2 className="text-3xl font-extrabold text-white tracking-tight mb-2">Welcome Back</h2>
-        <p className="text-slate-400 text-sm">Please sign in to access your dashboard</p>
+        <h2 className="text-3xl font-extrabold text-white tracking-tight mb-2">
+          Welcome Back
+        </h2>
+        <p className="text-slate-400 text-sm">
+          Please sign in to access your dashboard
+        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
         <div className="space-y-2">
-          <label htmlFor="email" className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
+          <label
+            htmlFor="email"
+            className="text-xs font-semibold text-slate-400 uppercase tracking-wider block"
+          >
             Email Address
           </label>
           <div className="relative group">
@@ -105,15 +114,22 @@ export default function Login() {
               <Mail size={18} />
             </div>
             <input
-              id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="w-full pl-11 pr-4 py-3 bg-white/[0.03] border border-white/[0.08] rounded-xl focus:border-indigo-500 focus:shadow-[0_0_0_2px_rgba(99,102,241,0.2)] text-white placeholder-slate-500 transition-all duration-200 outline-none"
-              placeholder="Enter your email" required
+              placeholder="Enter your email"
+              required
             />
           </div>
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="password" className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
+          <label
+            htmlFor="password"
+            className="text-xs font-semibold text-slate-400 uppercase tracking-wider block"
+          >
             Password
           </label>
           <div className="relative group">
@@ -121,19 +137,40 @@ export default function Login() {
               <Lock size={18} />
             </div>
             <input
-              id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               className="w-full pl-11 pr-4 py-3 bg-white/[0.03] border border-white/[0.08] rounded-xl focus:border-indigo-500 focus:shadow-[0_0_0_2px_rgba(99,102,241,0.2)] text-white placeholder-slate-500 transition-all duration-200 outline-none"
-              placeholder="Enter your password" required
+              placeholder="Enter your password"
+              required
             />
           </div>
         </div>
 
         <div className="flex items-center justify-between text-sm">
           <label className="flex items-center gap-2 cursor-pointer group">
-            <input type="checkbox" className="peer shrink-0 appearance-none w-4 h-4 border border-white/10 rounded bg-white/[0.02] checked:bg-indigo-500 checked:border-indigo-500 focus:outline-none transition-all" />
-            <span className="text-slate-400 group-hover:text-slate-200 transition-colors">Remember me</span>
+            <div className="relative flex items-center justify-center">
+              <input
+                type="checkbox"
+                className="peer shrink-0 appearance-none w-4.5 h-4.5 border border-white/10 rounded bg-white/[0.02] checked:bg-indigo-500 checked:border-indigo-500 focus:outline-none transition-all"
+              />
+              <svg
+                className="absolute w-3.5 h-3.5 pointer-events-none opacity-0 peer-checked:opacity-100 text-white fill-current transition-opacity"
+                viewBox="0 0 20 20"
+              >
+                <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
+              </svg>
+            </div>
+            <span className="text-slate-400 group-hover:text-slate-200 transition-colors">
+              Remember me
+            </span>
           </label>
-          <a href="#forgot" className="font-medium text-indigo-400 hover:text-indigo-300 transition-colors">
+
+          <a
+            href="#forgot"
+            className="font-medium text-indigo-400 hover:text-indigo-300 transition-colors"
+          >
             Forgot Password?
           </a>
         </div>
@@ -143,7 +180,8 @@ export default function Login() {
         )}
 
         <button
-          type="submit" disabled={loading}
+          type="submit"
+          disabled={loading}
           className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:opacity-90 active:scale-[0.98] disabled:opacity-60 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-200 shadow-lg shadow-indigo-500/20 cursor-pointer"
         >
           {loading ? "Signing in..." : "Sign In"}
@@ -169,30 +207,34 @@ export default function Login() {
 
       <div className="mt-8 text-center text-sm text-slate-400 z-10 relative">
         Don&apos;t have an account?{" "}
-        <Link to="/register" className="font-semibold text-indigo-400 hover:text-indigo-300 transition-colors">
+        <Link
+          to="/register"
+          className="font-semibold text-indigo-400 hover:text-indigo-300 transition-colors"
+        >
           Create Account
         </Link>
       </div>
 
       {showRoleModal && (
-        <div className="fixed inset-0 bg-[#030712]/90 backdrop-blur-md flex items-center justify-center z-[2000] p-6">
-          <div className="bg-[#0b0f19] border border-white/10 rounded-3xl p-8 w-full max-w-[440px] shadow-2xl text-center">
+        <div className="fixed inset-0 bg-[#030712]/90 backdrop-blur-md flex items-center justify-center z-[2000] p-6 animate-fade-in">
+          <div className="bg-[#0b0f19] border border-white/10 rounded-3xl p-8 w-full max-w-[440px] shadow-2xl relative animate-slide-up text-center">
             <h3 className="text-2xl font-extrabold text-white mb-2">Select Your Role</h3>
-            <p className="text-slate-400 text-sm mb-6">Please choose your account type to continue</p>
+            <p className="text-slate-400 text-sm mb-6">Please choose your account type to continue registration</p>
             <div className="flex flex-col gap-3">
               {[
-                { value: "customer",  label: "Customer",  desc: "Browse events & explore layouts", icon: "🎟️" },
-                { value: "vendor",    label: "Vendor",    desc: "Manage stalls & business profile", icon: "🏪" },
-                { value: "organizer", label: "Organizer", desc: "Create & coordinate events", icon: "🗂️" },
-              ].map((r) => (
+                { value: "customer", label: "Customer", desc: "Browse events & explore layouts", icon: "🎟️" },
+                { value: "vendor", label: "Vendor", desc: "Manage stalls & business profile", icon: "🏪" },
+                { value: "organizer", label: "Organizer", desc: "Create & coordinate events", icon: "🗂️" }
+              ].map((roleOption) => (
                 <button
-                  key={r.value} onClick={() => handleRoleSelection(r.value)}
+                  key={roleOption.value}
+                  onClick={() => handleRoleSelection(roleOption.value)}
                   className="flex items-center gap-4 p-4 rounded-2xl border border-white/10 bg-white/[0.02] text-left hover:border-indigo-500 hover:bg-indigo-500/5 transition-all duration-200 cursor-pointer group"
                 >
-                  <span className="text-2xl">{r.icon}</span>
+                  <span className="text-2xl">{roleOption.icon}</span>
                   <div className="flex-1">
-                    <p className="text-sm font-bold text-white group-hover:text-indigo-400 transition-colors">{r.label}</p>
-                    <p className="text-xs text-slate-500 leading-tight mt-0.5">{r.desc}</p>
+                    <p className="text-sm font-bold text-white group-hover:text-indigo-400 transition-colors">{roleOption.label}</p>
+                    <p className="text-xs text-slate-500 leading-tight mt-0.5">{roleOption.desc}</p>
                   </div>
                 </button>
               ))}

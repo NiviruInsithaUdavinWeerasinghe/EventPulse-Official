@@ -3,7 +3,13 @@ import jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
 import User from '../models/User.js';
 
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const allowedAudiences = [
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.VITE_GOOGLE_CLIENT_ID,
+  '254311975723-hjmj6l4jdn02ouh80k206atn4pt2uual.apps.googleusercontent.com',
+].filter(Boolean);
+
+const client = new OAuth2Client(allowedAudiences[0]);
 const router = express.Router();
 
 const signToken = (id, role) =>
@@ -83,7 +89,7 @@ router.post('/google-login', async (req, res) => {
 
     const ticket = await client.verifyIdToken({
       idToken: credential,
-      audience: process.env.GOOGLE_CLIENT_ID,
+      audience: allowedAudiences,
     });
 
     const { email, name } = ticket.getPayload();
