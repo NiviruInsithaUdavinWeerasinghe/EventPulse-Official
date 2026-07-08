@@ -1,12 +1,13 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+
+dotenv.config();
+
 import connectDB from './config/db.js';
 import eventRoutes from './routes/eventRoutes.js';
 import authRoutes from './routes/auth.js';
 import vendorRoutes from './routes/vendorRoutes.js';
-
-dotenv.config();
 
 // Connect to MongoDB
 connectDB();

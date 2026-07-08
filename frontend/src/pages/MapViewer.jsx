@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ExternalLink, Calendar, Plus, Minus, RefreshCw, Trash2, Layers, Sparkles, MapPin, Tag, X, Search } from 'lucide-react';
+import { ExternalLink, Calendar, Plus, Minus, RefreshCw, Trash2, Layers, Sparkles, MapPin, Tag, X, Search, Bath, HeartPulse, DoorOpen, Flame } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 const API_BASE = '/api';
@@ -35,6 +35,13 @@ const CATEGORY_STYLES = {
   'Restrooms':               { fill: 'rgba(20,  184, 166, 0.18)', stroke: '#14b8a6' },
 };
 const DEFAULT_ZONE_STYLE = { fill: 'rgba(37, 99, 235, 0.2)', stroke: '#3b82f6' };
+
+const CATEGORY_ICON_MAP = {
+  'Restrooms':         { Icon: Bath,       color: '#0d9488' },
+  'First Aid':         { Icon: HeartPulse, color: '#e53e3e' },
+  'Exit':              { Icon: DoorOpen,   color: '#276749' },
+  'Fire Extinguisher': { Icon: Flame,      color: '#c05621' },
+};
 
 const LS_ZOOM_KEY = 'ep-map-zoom';
 const DEFAULT_ZOOM = 1.25;
@@ -128,13 +135,17 @@ export default function MapViewer({ eventId: propEventId }) {
   const [touchStartDist, setTouchStartDist]   = useState(0);
   const [touchStartScale, setTouchStartScale] = useState(1);
 
+  // ─── Draggable icon positions (keyed by category, persisted per event) ─────
+  const [iconPositions, setIconPositions] = useState({});
+
   // Live refs — kept in sync synchronously to avoid stale-closure glitches
-  const scaleRef      = useRef(getInitialScale());
-  const panRef        = useRef({ x: 0, y: 0 });
-  const dragStartRef  = useRef(null);    // { clientX, clientY, panX, panY, target }
-  const isDragActiveRef = useRef(false); // true once movement exceeds 4 px threshold
-  const containerRef  = useRef(null);
-  const centeredRef   = useRef(false);
+  const scaleRef        = useRef(getInitialScale());
+  const panRef          = useRef({ x: 0, y: 0 });
+  const dragStartRef    = useRef(null);    // { clientX, clientY, panX, panY, target }
+  const isDragActiveRef = useRef(false);   // true once movement exceeds 4 px threshold
+  const containerRef    = useRef(null);
+  const centeredRef     = useRef(false);
+  const iconDragRef     = useRef(null);    // { zoneId, startSvgX, startSvgY, startCx, startCy }
 
   // --- Fetch Event ----------------------------------------------------------
   const fetchEvent = async () => {
@@ -329,6 +340,19 @@ export default function MapViewer({ eventId: propEventId }) {
         .catch(() => setIsLoading(false));
     }
   }, [event, processSvgText]);
+
+  // Load only explicitly saved icon positions for this event from localStorage
+  useEffect(() => {
+    if (!eventId) return;
+    const stored = {};
+    Object.keys(CATEGORY_ICON_MAP).forEach(cat => {
+      try {
+        const saved = localStorage.getItem(`ep-icon-${eventId}-${cat}`);
+        if (saved) stored[cat] = JSON.parse(saved);
+      } catch { /* ignore */ }
+    });
+    setIconPositions(stored);
+  }, [eventId]);
 
   // Reset centered state on event change
   useEffect(() => {
@@ -742,6 +766,20 @@ export default function MapViewer({ eventId: propEventId }) {
   };
 
   const handleMouseMove = (e) => {
+    // ── Icon drag takes priority over map pan ──────────────────────────────
+    if (iconDragRef.current) {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect) {
+        const svgX = (e.clientX - rect.left - panRef.current.x) / scaleRef.current;
+        const svgY = (e.clientY - rect.top  - panRef.current.y) / scaleRef.current;
+        const { zoneId, startSvgX, startSvgY, startCx, startCy } = iconDragRef.current;
+        setIconPositions(prev => ({
+          ...prev,
+          [zoneId]: { x: startCx + svgX - startSvgX, y: startCy + svgY - startSvgY },
+        }));
+      }
+      return;
+    }
     if (!dragStartRef.current) return;
     const dx = e.clientX - dragStartRef.current.clientX;
     const dy = e.clientY - dragStartRef.current.clientY;
@@ -755,6 +793,15 @@ export default function MapViewer({ eventId: propEventId }) {
   };
 
   const handleMouseUp = () => {
+    if (iconDragRef.current) {
+      const { zoneId } = iconDragRef.current;
+      const pos = iconPositions[zoneId];
+      if (pos && eventId) {
+        try { localStorage.setItem(`ep-icon-${eventId}-${zoneId}`, JSON.stringify(pos)); } catch { /* ignore */ }
+      }
+      iconDragRef.current = null;
+      return;
+    }
     if (!dragStartRef.current) return;
     if (!isDragActiveRef.current) {
       // Short click — delegate to shape-selection logic
@@ -775,6 +822,7 @@ export default function MapViewer({ eventId: propEventId }) {
   };
 
   const handleMouseLeave = () => {
+    iconDragRef.current = null;
     if (isDragActiveRef.current) {
       dragStartRef.current  = null;
       isDragActiveRef.current = false;
@@ -965,12 +1013,54 @@ export default function MapViewer({ eventId: propEventId }) {
           <div style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`, transformOrigin: '0 0', display: 'inline-block' }}>
             <div className="min-h-full min-w-full flex items-center justify-center p-6">
               {isSvgMap && clientSvgContent ? (
-                <div
-                  id="blueprint-wrapper"
-                  className={isEditorMode ? "" : "attendee-svg-container"}
-                  dangerouslySetInnerHTML={{ __html: clientSvgContent }}
-                  style={{ lineHeight: 0, userSelect: 'none', cursor: 'default' }}
-                />
+                <div style={{ position: 'relative', display: 'inline-block' }}>
+                  <div
+                    id="blueprint-wrapper"
+                    className={isEditorMode ? "" : "attendee-svg-container"}
+                    dangerouslySetInnerHTML={{ __html: clientSvgContent }}
+                    style={{ lineHeight: 0, userSelect: 'none', cursor: 'default' }}
+                  />
+                  <svg
+                    viewBox={`0 0 ${svgDimensions.w} ${svgDimensions.h}`}
+                    width={svgDimensions.w}
+                    height={svgDimensions.h}
+                    style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
+                  >
+                    {Object.entries(CATEGORY_ICON_MAP).map(([category, { Icon, color }], index) => {
+                      const iconDefaults = [
+                        { xFrac: 0.10, yFrac: 0.08 },
+                        { xFrac: 0.25, yFrac: 0.08 },
+                        { xFrac: 0.40, yFrac: 0.08 },
+                        { xFrac: 0.55, yFrac: 0.08 },
+                      ];
+                      const savedPos = iconPositions[category];
+                      const cx = savedPos ? savedPos.x : iconDefaults[index].xFrac * svgDimensions.w;
+                      const cy = savedPos ? savedPos.y : iconDefaults[index].yFrac * svgDimensions.h;
+                      return (
+                        <g
+                          key={`icon-${category}`}
+                          style={{ pointerEvents: 'all', cursor: 'grab' }}
+                          onMouseDown={(e) => {
+                            e.stopPropagation();
+                            const rect = containerRef.current?.getBoundingClientRect();
+                            if (rect) {
+                              const svgX = (e.clientX - rect.left - panRef.current.x) / scaleRef.current;
+                              const svgY = (e.clientY - rect.top  - panRef.current.y) / scaleRef.current;
+                              iconDragRef.current = { zoneId: category, startSvgX: svgX, startSvgY: svgY, startCx: cx, startCy: cy };
+                            }
+                          }}
+                        >
+                          <circle cx={cx} cy={cy} r={14} fill={color} />
+                          <foreignObject x={cx - 10} y={cy - 10} width={20} height={20} style={{ pointerEvents: 'none' }}>
+                            <div xmlns="http://www.w3.org/1999/xhtml" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
+                              <Icon size={13} color="white" strokeWidth={2.5} />
+                            </div>
+                          </foreignObject>
+                        </g>
+                      );
+                    })}
+                  </svg>
+                </div>
               ) : (
                 <img
                   src={event.floorMapUrl}
@@ -993,13 +1083,14 @@ export default function MapViewer({ eventId: propEventId }) {
           </div>
 
           {/* EP-22: Map Legend */}
-          {event?.zones?.length > 0 && (() => {
-            const used = [...new Map(
-              event.zones
-                .filter(z => z.category)
-                .map(z => [z.category, (CATEGORY_STYLES[z.category] || DEFAULT_ZONE_STYLE).stroke])
-            ).entries()];
-            if (used.length === 0) return null;
+          {(() => {
+            const used = event?.zones?.length > 0
+              ? [...new Map(
+                  event.zones
+                    .filter(z => z.category)
+                    .map(z => [z.category, (CATEGORY_STYLES[z.category] || DEFAULT_ZONE_STYLE).stroke])
+                ).entries()]
+              : [];
             return (
               <div className="absolute bottom-5 left-5 flex flex-col gap-1.5 z-20 text-[0.65rem] text-slate-400 bg-[#0b0f19]/80 border border-white/8 backdrop-blur-md rounded-xl px-3 py-2.5">
                 <p className="font-bold text-[0.6rem] text-slate-600 uppercase tracking-widest mb-0.5">
@@ -1008,6 +1099,18 @@ export default function MapViewer({ eventId: propEventId }) {
                 {used.map(([category, color]) => (
                   <div key={category} className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-sm" style={{ background: color, opacity: 0.85 }} />
+                    <span>{category}</span>
+                  </div>
+                ))}
+                {used.length > 0 && <div className="h-px bg-white/10 my-0.5" />}
+                <p className="font-bold text-[0.6rem] text-slate-600 uppercase tracking-widest mb-0.5">
+                  Safety Landmarks
+                </p>
+                {Object.entries(CATEGORY_ICON_MAP).map(([category, { Icon, color }]) => (
+                  <div key={category} className="flex items-center gap-2">
+                    <span className="w-4 h-4 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: color }}>
+                      <Icon size={9} color="white" strokeWidth={2.5} />
+                    </span>
                     <span>{category}</span>
                   </div>
                 ))}
@@ -1466,6 +1569,9 @@ export default function MapViewer({ eventId: propEventId }) {
                   <option value="Presentation Area">Presentation Area</option>
                   <option value="Refreshments">Refreshments</option>
                   <option value="Restrooms">Restrooms</option>
+                  <option value="First Aid">First Aid</option>
+                  <option value="Exit">Exit</option>
+                  <option value="Fire Extinguisher">Fire Extinguisher</option>
                 </select>
               </div>
               <div className="flex gap-2 justify-end mt-2">
