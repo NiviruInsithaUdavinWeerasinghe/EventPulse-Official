@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ExternalLink, Calendar, Plus, Minus, RefreshCw, Trash2, Layers, Sparkles, MapPin, Tag, X } from 'lucide-react';
+import { ExternalLink, Calendar, Plus, Minus, RefreshCw, Trash2, Layers, Sparkles, MapPin, Tag, X, Search } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 const API_BASE = '/api';
@@ -91,6 +91,15 @@ export default function MapViewer({ eventId: propEventId }) {
   // EP-22: Polygon selector — tracks the currently highlighted zone
   const [selectedStall, setSelectedStall] = useState(null);
 
+
+// ── EP-27/28/29/30: Search & Filter States ────────────────────────────────
+  const [searchQuery, setSearchQuery]           = useState('');
+  const [activeCategory, setActiveCategory]     = useState('All');
+  const [searchResults, setSearchResults]       = useState(null);
+  const [autocompleteList, setAutocompleteList] = useState([]);
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const searchRef = useRef(null);
+
   // Prefill vendor form when a vacant stall is clicked
   useEffect(() => {
     if (selectedStall) {
@@ -155,6 +164,60 @@ export default function MapViewer({ eventId: propEventId }) {
       fetchApplications();
     }
   }, [eventId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── EP-28: Backend search API call ──────────────────────────────────────
+  const runSearch = useCallback(async (q, category) => {
+    if (!eventId) return;
+    if (!q.trim() && category === 'All') {
+      setSearchResults(null);
+      setAutocompleteList([]);
+      return;
+    }
+    try {
+      const params = new URLSearchParams();
+      if (q.trim()) params.set('q', q.trim());
+      if (category !== 'All') params.set('category', category);
+      const res = await fetch(`${API_BASE}/events/${eventId}/search?${params}`);
+      const data = await res.json();
+      if (data.success) {
+        setSearchResults(data.data);
+        const suggestions = data.data
+          .flatMap(z => [z.name, z.id].filter(Boolean))
+          .filter((v, i, a) => a.indexOf(v) === i)
+          .slice(0, 6);
+        setAutocompleteList(suggestions);
+      }
+    } catch (err) {
+      console.error('Search error:', err);
+    }
+  }, [eventId]);
+
+  // Debounce search as user types
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      runSearch(searchQuery, activeCategory);
+      setShowAutocomplete(searchQuery.length > 0);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchQuery, activeCategory, runSearch]);
+
+  // Close autocomplete on outside click
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (searchRef.current && !searchRef.current.contains(e.target)) {
+        setShowAutocomplete(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  // ── EP-29: active zones filtered by search results ───────────────────────
+  const activeZones = useMemo(() => {
+    if (!event?.zones) return [];
+    if (searchResults === null) return event.zones;
+    return searchResults;
+  }, [event, searchResults]);
 
   // --- Pre-process SVG (EP-22: inject selectable-shape class on every polygon)
   const processSvgText = useCallback((text) => {
@@ -923,6 +986,66 @@ export default function MapViewer({ eventId: propEventId }) {
         {/* Right Sidebar */}
         <aside className="w-[280px] shrink-0 bg-[#0b0f19]/95 border-l border-white/5 overflow-y-auto p-5 flex flex-col gap-4">
 
+          {/* ── EP-27/28/29/30: Search + Category Filter (Mesanda) ─────── */}
+          {!isEditorMode && (
+            <div className="flex flex-col gap-3">
+              <div ref={searchRef} className="relative">
+                <div className="relative flex items-center">
+                  <Search className="absolute left-3 w-3.5 h-3.5 text-slate-500 pointer-events-none" />
+                  <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                    onFocus={() => searchQuery.length > 0 && setShowAutocomplete(true)}
+                    placeholder="Search stalls, tags, zones…"
+                    className="w-full pl-8 pr-8 py-2 bg-white/[0.04] border border-white/[0.08] rounded-xl text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 transition" />
+                  {searchQuery && (
+                    <button onClick={() => { setSearchQuery(''); setSearchResults(null); setShowAutocomplete(false); }}
+                      className="absolute right-2.5 text-slate-500 hover:text-slate-300 transition cursor-pointer">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+                {showAutocomplete && autocompleteList.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-[#0d111d] border border-white/[0.08] rounded-xl shadow-xl z-50 overflow-hidden">
+                    {autocompleteList.map((s, i) => (
+                      <button key={i} onClick={() => { setSearchQuery(s); setShowAutocomplete(false); }}
+                        className="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-white/[0.06] hover:text-white transition flex items-center gap-2">
+                        <Search className="w-3 h-3 text-slate-600 shrink-0" />{s}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {['All', ...[...new Set((event?.zones||[]).map(z=>z.category).filter(Boolean))]].map(cat => (
+                  <button key={cat} onClick={() => setActiveCategory(cat)}
+                    className={`text-[0.65rem] font-semibold px-2.5 py-1 rounded-full border transition cursor-pointer ${activeCategory===cat ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300' : 'bg-white/[0.02] border-white/[0.08] text-slate-500 hover:border-white/20 hover:text-slate-300'}`}>
+                    {cat}
+                  </button>
+                ))}
+              </div>
+              {searchResults !== null && (
+                <div className="flex items-center justify-between px-1">
+                  <p className="text-[0.65rem] text-slate-500">{searchResults.length > 0 ? `${searchResults.length} zone${searchResults.length>1?'s':''} found` : 'No zones match'}</p>
+                  <button onClick={() => { setSearchQuery(''); setActiveCategory('All'); setSearchResults(null); }} className="text-[0.6rem] text-indigo-400 hover:text-indigo-300 transition cursor-pointer">Clear</button>
+                </div>
+              )}
+              {searchResults !== null && searchResults.length > 0 && (
+                <div className="flex flex-col gap-1 max-h-40 overflow-y-auto pr-1">
+                  {searchResults.map(zone => (
+                    <button key={zone.id} onClick={() => setSelectedStall({ id: zone.id, name: zone.name||zone.id, category: zone.category||'Uncategorised', center: zone.center||null })}
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.05] hover:border-indigo-500/30 transition text-left cursor-pointer">
+                      <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: (CATEGORY_STYLES[zone.category]||DEFAULT_ZONE_STYLE).stroke }} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-slate-200 truncate">{zone.name||zone.id}</p>
+                        <p className="text-[0.6rem] text-slate-600 font-mono">{zone.id}</p>
+                      </div>
+                      <MapPin className="w-3 h-3 text-slate-600 shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="h-px bg-white/5" />
+            </div>
+          )}
           {/* ── Batch Actions widget ───────────────────────────────────── */}
           {isEditorMode && (
             <div className="flex flex-col gap-3 p-3 bg-white/[0.02] border border-white/[0.06] rounded-xl animate-scale-in">
