@@ -8,6 +8,8 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [googlePayload, setGooglePayload] = useState(null);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -32,9 +34,6 @@ export default function Login() {
     }
   };
 
-  const [showRoleModal, setShowRoleModal] = useState(false);
-  const [googlePayload, setGooglePayload] = useState(null);
-
   const handleGoogleSuccess = async (response) => {
     setError("");
     setLoading(true);
@@ -46,7 +45,7 @@ export default function Login() {
       });
       const data = await res.json();
       if (!res.ok) return setError(data.message || "Google sign in failed.");
-      
+
       if (data.isNewUser) {
         setGooglePayload(data);
         setShowRoleModal(true);
@@ -73,7 +72,7 @@ export default function Login() {
       });
       const data = await res.json();
       if (!res.ok) return setError(data.message || "Setting role failed.");
-      
+
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
       navigate("/dashboard");
