@@ -16,6 +16,7 @@ import ProfileUpdateForm from './components/ProfileUpdateForm.jsx';
 import CustomerDashboard from './pages/CustomerDashboard.jsx';
 import EventDetails from './pages/EventDetails.jsx';
 import Checkout from './pages/Checkout.jsx';
+import WalletActivated from './pages/WalletActivated.jsx';
 
 // ─── Helper: decode JWT role from localStorage ──────────────────────────────
 function getRoleFromToken() {
@@ -148,6 +149,13 @@ export default function AppRouter() {
       <Route path="/customer/list" element={
         <ProtectedRoute allowedRoles={['customer']}>
           <CustomerList />
+        </ProtectedRoute>
+      } />
+
+      {/* Wallet activation confirmation — customer only */}
+      <Route path="/customer/wallet-activated" element={
+        <ProtectedRoute allowedRoles={['customer']}>
+          <WalletActivated />
         </ProtectedRoute>
       } />
 
