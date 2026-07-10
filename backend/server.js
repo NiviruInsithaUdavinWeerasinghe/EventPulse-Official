@@ -8,6 +8,7 @@ import connectDB from './config/db.js';
 import eventRoutes from './routes/eventRoutes.js';
 import authRoutes from './routes/auth.js';
 import vendorRoutes from './routes/vendorRoutes.js';
+import payhereRoutes from './routes/payhereRoutes.js';
 
 // Connect to MongoDB
 connectDB();
@@ -34,3 +35,5 @@ app.use('/api/vendors', vendorRoutes);
 app.listen(PORT, () => {
   console.log(`EventPulse Official backend server running on port ${PORT}`);
 });
+// PayHere payment routes (EP-55 - mesan)
+app.use('/api/payhere', payhereRoutes);
