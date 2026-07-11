@@ -1,6 +1,12 @@
 import express from 'express';
 import { protect, requireRole } from '../middleware/auth.js';
-import { initWallet, scanEntryQr, topUpWallet } from '../controllers/walletController.js';
+import {
+  initWallet,
+  scanEntryQr,
+  topUpWallet,
+  generatePaymentToken,
+  getActiveToken,
+} from '../controllers/walletController.js';
 
 const router = express.Router();
 
@@ -20,4 +26,13 @@ router.post('/scan-entry', scanEntryQr);
 // Top up user wallet balance after payment validation.
 router.post('/topup', topUpWallet);
 
+// POST /api/wallet/token/generate  (EP-59 / EP-60 / EP-61 — US-403)
+// Generate a fresh single-use 60-second payment QR token. Invalidates any prior active token.
+router.post('/token/generate', generatePaymentToken);
+
+// GET /api/wallet/token/active  (EP-60 — US-403)
+// Return the current Active token if one exists and hasn't expired, otherwise null.
+router.get('/token/active', getActiveToken);
+
 export default router;
+
