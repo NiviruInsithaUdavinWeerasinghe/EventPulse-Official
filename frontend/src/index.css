@@ -77,10 +77,18 @@
 
 @layer utilities {
   .gradient-text-hero {
-    background: linear-gradient(to right bottom, #ffffff 30%, #94a3b8 100%);
+    background: linear-gradient(to right bottom, #0f172a 30%, #475569 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+  }
+
+  :where(.dark) .gradient-text-hero {
+    background: linear-gradient(to right bottom, #ffffff 30%, #94a3b8 100%);
+  }
+
+  .dark .gradient-text-hero {
+    background: linear-gradient(to right bottom, #ffffff 30%, #94a3b8 100%);
   }
 
   .gradient-text-brand {
