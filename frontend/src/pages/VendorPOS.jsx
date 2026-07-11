@@ -206,6 +206,34 @@ export default function VendorPOS() {
             </button>
           </div>
 
+        ) : status === 'error' && errorMessage === 'Insufficient Wallet Balance' ? (
+          <div className="text-center py-8 animate-fade-in">
+            <div className="w-16 h-16 bg-red-500/10 border border-red-500/25 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+              <AlertCircle className="w-10 h-10 text-red-400" />
+            </div>
+            <h2 className="text-xl font-extrabold text-red-400 mb-2">Insufficient Wallet Balance</h2>
+            <p className="text-sm text-slate-400 mb-6 leading-relaxed">
+              The attendee's digital wallet does not hold sufficient funds to pay the bill of <span className="font-bold text-slate-200">LKR {parseFloat(billAmount).toFixed(2)}</span>.
+            </p>
+            <div className="bg-red-500/5 border border-red-500/10 rounded-xl p-4 text-left text-xs mb-8 text-red-300/80 leading-relaxed">
+              <span className="font-bold">Suggested action:</span> Please ask the attendee to top up their wallet or complete payment via cash/card.
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setStatus('idle')}
+                className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 font-bold rounded-xl transition-all cursor-pointer"
+              >
+                Back to POS
+              </button>
+              <button
+                onClick={resetPOS}
+                className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition-all cursor-pointer shadow-lg shadow-red-500/20"
+              >
+                Reset POS
+              </button>
+            </div>
+          </div>
+
         ) : (
           <div className="space-y-6">
 

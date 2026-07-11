@@ -14,7 +14,10 @@ import {
   MapPin,
   Clock,
   X,
+  AlertTriangle,
+  CheckCircle,
 } from 'lucide-react';
+
 
 /* ─── helpers ─────────────────────────────────────────── */
 function getUser() {
@@ -438,6 +441,8 @@ export default function CustomerDashboard() {
   const [notifCount] = useState(2);
   const [tickets, setTickets] = useState([]);
   const [selectedTicket, setSelectedTicket] = useState(null); // for ticket QR modal
+  const [activeAlert, setActiveAlert] = useState(null); // { type, message, amount, vendorName }
+
 
   useEffect(() => {
     const h = new Date().getHours();
@@ -477,6 +482,47 @@ export default function CustomerDashboard() {
     }
   }, [user.id]);
 
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token || !user.id) return;
+
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${wsProtocol}//${window.location.hostname}:5000/?token=${token}`;
+    const ws = new WebSocket(wsUrl);
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'TX_REJECTED') {
+          setActiveAlert({
+            type: 'TX_REJECTED',
+            message: data.message || 'Insufficient Wallet Balance',
+            amount: data.amount,
+            timestamp: data.timestamp,
+          });
+        } else if (data.type === 'TX_SUCCESS') {
+          setActiveAlert({
+            type: 'TX_SUCCESS',
+            message: 'Payment Successful',
+            amount: data.amount,
+            vendorName: data.vendorName || 'Stall Vendor',
+            timestamp: data.timestamp,
+          });
+          if (data.remainingBalance !== undefined) {
+            setWalletBalance(data.remainingBalance);
+          }
+        }
+      } catch (err) {
+        console.error('Error parsing WS message:', err);
+      }
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [user.id]);
+
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -500,11 +546,80 @@ export default function CustomerDashboard() {
         <TicketQrModal ticket={selectedTicket} onClose={() => setSelectedTicket(null)} />
       )}
 
+      {activeAlert && (
+        <div
+          className="fixed inset-0 z-55 flex items-center justify-center p-4"
+          style={{ backdropFilter: 'blur(12px)', background: 'rgba(3,7,18,0.85)' }}
+          onClick={() => setActiveAlert(null)}
+        >
+          <div
+            className="relative w-full max-w-sm rounded-3xl p-7 text-center border bg-white dark:bg-gradient-to-br dark:from-[#0f1629] dark:to-[#0a0f1e] border-slate-200 dark:border-red-500/35 shadow-xl shadow-red-500/10 text-slate-800 dark:text-slate-100"
+            onClick={e => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setActiveAlert(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+
+            {activeAlert.type === 'TX_REJECTED' ? (
+              <>
+                <div className="w-16 h-16 bg-red-500/10 border border-red-500/25 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+                  <AlertTriangle className="w-10 h-10 text-red-500" />
+                </div>
+                <h2 className="text-xl font-extrabold text-red-555 dark:text-red-400 mb-2">Insufficient Balance</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
+                  A checkout request for <span className="font-bold text-slate-800 dark:text-slate-150">LKR {activeAlert.amount.toFixed(2)}</span> was declined due to insufficient funds in your wallet.
+                </p>
+                <div className="bg-red-500/5 border border-red-500/10 rounded-xl p-4 text-left text-xs mb-8 text-red-600 dark:text-red-300/80 leading-relaxed">
+                  <span className="font-bold">Suggested action:</span> Please tap the <strong>+ Top Up Wallet</strong> button on your dashboard to add more funds before retrying the checkout.
+                </div>
+                <button
+                  onClick={() => { setActiveAlert(null); setShowTopUp(true); }}
+                  className="w-full py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition-all cursor-pointer shadow-lg shadow-red-500/20"
+                >
+                  Top Up Now
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/25 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle className="w-10 h-10 text-emerald-400" />
+                </div>
+                <h2 className="text-xl font-extrabold text-slate-800 dark:text-slate-100 mb-1">Payment Successful</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">Processed at {activeAlert.vendorName}</p>
+                <p className="text-3xl font-extrabold text-slate-800 dark:text-slate-55 mb-6">
+                  LKR {activeAlert.amount.toFixed(2)}
+                </p>
+                <div className="bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/[0.06] rounded-xl p-4 text-left text-xs mb-8 space-y-2 text-slate-500 dark:text-slate-400">
+                  <div className="flex justify-between">
+                    <span>Paid To:</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-200">{activeAlert.vendorName}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Remaining Balance:</span>
+                    <span className="text-slate-850 dark:text-slate-200 font-bold">LKR {walletBalance.toLocaleString()}</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setActiveAlert(null)}
+                  className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold rounded-xl transition-all cursor-pointer shadow-lg shadow-emerald-500/20"
+                >
+                  Close Receipt
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       <TopUpModal 
         isOpen={showTopUp} 
         onClose={() => setShowTopUp(false)} 
         onTopUpSuccess={(newBalance) => setWalletBalance(newBalance)} 
       />
+
 
 
       {/* ── Main ── */}

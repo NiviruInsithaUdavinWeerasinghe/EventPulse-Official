@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import http from 'http';
+import { initWebSocket } from './socketManager.js';
 
 dotenv.config();
 
@@ -15,7 +17,11 @@ import walletRoutes from './routes/walletRoutes.js';
 connectDB();
 
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
+
+// Initialize WebSocket server
+initWebSocket(server);
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
@@ -36,8 +42,9 @@ app.use('/api/vendors', vendorRoutes);
 // Wallet service routes (customer-only — JWT + role guard applied inside walletRoutes)
 app.use('/api/wallet', walletRoutes);
 
-app.listen(PORT, () => {
-  console.log(`EventPulse Official backend server running on port ${PORT}`);
-});
 // PayHere payment routes (EP-55 - mesan)
 app.use('/api/payhere', payhereRoutes);
+
+server.listen(PORT, () => {
+  console.log(`EventPulse Official backend server running on port ${PORT}`);
+});
