@@ -18,6 +18,7 @@ import CustomerDashboard from './pages/CustomerDashboard.jsx';
 import EventDetails from './pages/EventDetails.jsx';
 import Checkout from './pages/Checkout.jsx';
 import WalletActivated from './pages/WalletActivated.jsx';
+import PaymentQR from './pages/PaymentQR.jsx';
 
 // ─── Helper: decode JWT role from localStorage ──────────────────────────────
 function getRoleFromToken() {
@@ -164,6 +165,13 @@ export default function AppRouter() {
       <Route path="/customer/wallet-activated" element={
         <ProtectedRoute allowedRoles={['customer']}>
           <WalletActivated />
+        </ProtectedRoute>
+      } />
+
+      {/* US-403 / EP-62 — Payment QR token display (customer only) */}
+      <Route path="/customer/wallet/pay" element={
+        <ProtectedRoute allowedRoles={['customer']}>
+          <PaymentQR />
         </ProtectedRoute>
       } />
 
