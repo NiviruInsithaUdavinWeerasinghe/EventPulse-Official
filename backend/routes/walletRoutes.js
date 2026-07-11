@@ -1,6 +1,6 @@
 import express from 'express';
 import { protect, requireRole } from '../middleware/auth.js';
-import { initWallet, scanEntryQr } from '../controllers/walletController.js';
+import { initWallet, scanEntryQr, topUpWallet } from '../controllers/walletController.js';
 
 const router = express.Router();
 
@@ -15,5 +15,9 @@ router.post('/init', initWallet);
 // POST /api/wallet/scan-entry
 // Process an entry QR scan and activate the wallet profile.
 router.post('/scan-entry', scanEntryQr);
+
+// POST /api/wallet/topup
+// Top up user wallet balance after payment validation.
+router.post('/topup', topUpWallet);
 
 export default router;
