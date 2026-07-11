@@ -19,6 +19,7 @@ import EventDetails from './pages/EventDetails.jsx';
 import Checkout from './pages/Checkout.jsx';
 import WalletActivated from './pages/WalletActivated.jsx';
 import PaymentQR from './pages/PaymentQR.jsx';
+import VendorPOS from './pages/VendorPOS.jsx';
 
 // ─── Helper: decode JWT role from localStorage ──────────────────────────────
 function getRoleFromToken() {
@@ -144,6 +145,12 @@ export default function AppRouter() {
           <MainLayout currentPage="vendor-portal" onNavigate={handleNavigate}>
             <VendorPortal />
           </MainLayout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/vendor/pos" element={
+        <ProtectedRoute allowedRoles={['vendor']}>
+          <VendorPOS />
         </ProtectedRoute>
       } />
 
