@@ -2,6 +2,8 @@ import mongoose from 'mongoose';
 import Wallet from '../models/Wallet.js';
 import WalletLedger from '../models/WalletLedger.js';
 import PaymentToken from '../models/PaymentToken.js';
+import User from '../models/User.js';
+import { sendNotification } from '../socketManager.js';
 
 /**
  * EP-80 (US-404)
@@ -58,13 +60,22 @@ export const processVendorCheckout = async (req, res) => {
 
     // US-405: Check if balance is adequate
     if (currentBalance < numAmount) {
-      // Return the specific required error message 'Insufficient Wallet Balance'
+      // Send WebSocket rejection event to attendee
+      sendNotification(wallet.user.toString(), {
+        type: 'TX_REJECTED',
+        message: 'Insufficient Wallet Balance',
+        amount: numAmount,
+        timestamp: new Date(),
+      });
+
       return res.status(400).json({ success: false, message: 'Insufficient Wallet Balance' });
     }
 
     // 4. Perform atomic balance deduction and ledger writing
     const newBalance = currentBalance - numAmount;
     wallet.balance = mongoose.Types.Decimal128.fromString(newBalance.toFixed(2));
+    
+    // Mongoose schema validator will throw an error and abort if balance goes negative
     await wallet.save();
 
     // Mark the payment token as Used
@@ -85,6 +96,20 @@ export const processVendorCheckout = async (req, res) => {
       referenceId: paymentToken._id.toString(),
     });
 
+    // Fetch vendor user profile details to get their full name
+    const vendorUser = await User.findById(req.user.id);
+    const vendorName = vendorUser ? vendorUser.fullName : 'Stall Vendor';
+
+    // Broadcast success event to the attendee's client screen
+    sendNotification(wallet.user.toString(), {
+      type: 'TX_SUCCESS',
+      message: 'Transaction completed successfully.',
+      amount: numAmount,
+      vendorName,
+      remainingBalance: newBalance,
+      timestamp: ledger.createdAt,
+    });
+
     return res.status(200).json({
       success: true,
       message: 'Transaction completed successfully.',
@@ -100,3 +125,4 @@ export const processVendorCheckout = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
