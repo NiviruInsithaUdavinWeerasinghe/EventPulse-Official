@@ -69,12 +69,18 @@ const MOCK_TICKETS = [
   },
 ];
 
-/* ─── QR Modal ──────────────────────────────────────────── */
-function QrModal({ balance, onClose }) {
+/* ─── Ticket QR Modal ───────────────────────────────────── */
+function TicketQrModal({ ticket, onClose }) {
+  // Encode the raw qrCodeData into a real scannable QR image (no library needed)
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=10&data=${encodeURIComponent(ticket.qrCodeData)}`;
+
+  const formatDate = (d) =>
+    d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD';
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backdropFilter: 'blur(12px)', background: 'rgba(3,7,18,0.85)' }}
+      style={{ backdropFilter: 'blur(12px)', background: 'rgba(3,7,18,0.88)' }}
       onClick={onClose}
     >
       <div
@@ -93,64 +99,48 @@ function QrModal({ balance, onClose }) {
           <X size={18} />
         </button>
 
-        <div className="mb-4">
-          <p className="text-xs text-slate-400 uppercase tracking-widest mb-1">Quick Pay</p>
-          <p className="text-2xl font-bold text-white">LKR {balance.toLocaleString()}</p>
-          <p className="text-xs text-slate-500 mt-1">Wallet Balance</p>
+        {/* Ticket meta */}
+        <p className="text-xs text-slate-400 uppercase tracking-widest mb-1">Entry Ticket</p>
+        <p className="text-base font-bold text-white mb-0.5 line-clamp-2">
+          {ticket.event?.name || 'Event'}
+        </p>
+        <div className="flex items-center justify-center gap-3 text-xs text-slate-500 mb-5">
+          <span className="flex items-center gap-1">
+            <CalendarDays size={11} /> {formatDate(ticket.event?.date)}
+          </span>
+          <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/5 font-semibold text-slate-300">
+            {ticket.tier}
+          </span>
+          <span>Seat {ticket.seat}</span>
         </div>
 
-        {/* SVG QR code placeholder */}
+        {/* Real QR code generated from ticket.qrCodeData */}
         <div
-          className="mx-auto rounded-2xl p-3 mb-4"
+          className="mx-auto rounded-2xl p-3 mb-5"
           style={{
             background: 'white',
-            width: 176,
-            height: 176,
+            width: 196,
+            height: 196,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <svg width={152} height={152} viewBox="0 0 37 37" fill="none">
-            {/* QR finder patterns */}
-            <rect x="1" y="1" width="10" height="10" rx="1.5" fill="#030712" />
-            <rect x="3" y="3" width="6" height="6" rx="0.5" fill="white" />
-            <rect x="4" y="4" width="4" height="4" rx="0.5" fill="#030712" />
-
-            <rect x="26" y="1" width="10" height="10" rx="1.5" fill="#030712" />
-            <rect x="28" y="3" width="6" height="6" rx="0.5" fill="white" />
-            <rect x="29" y="4" width="4" height="4" rx="0.5" fill="#030712" />
-
-            <rect x="1" y="26" width="10" height="10" rx="1.5" fill="#030712" />
-            <rect x="3" y="28" width="6" height="6" rx="0.5" fill="white" />
-            <rect x="4" y="29" width="4" height="4" rx="0.5" fill="#030712" />
-
-            {/* Data modules */}
-            {[
-              [13,1],[15,1],[17,1],[13,3],[17,3],[13,5],[15,5],[17,5],
-              [13,7],[15,7],[13,9],[15,9],[17,9],
-              [1,13],[3,13],[5,13],[7,13],[9,13],
-              [1,15],[5,15],[9,15],[1,17],[3,17],[7,17],[9,17],
-              [1,19],[3,19],[5,19],[1,21],[3,21],[7,21],[9,21],
-              [13,13],[15,13],[17,13],[19,13],[21,13],[13,15],[21,15],
-              [13,17],[15,17],[19,17],[13,19],[17,19],[21,19],
-              [13,21],[15,21],[17,21],[19,21],[21,21],
-              [23,23],[25,23],[23,25],[27,25],[23,27],[25,27],[27,27],
-              [29,23],[31,23],[33,23],[35,23],[29,25],[35,25],
-              [29,27],[31,27],[33,27],[29,29],[31,29],[29,31],[33,31],[35,31],
-              [23,29],[23,31],[23,33],[25,33],[27,33],
-            ].map(([x, y], i) => (
-              <rect key={i} x={x} y={y} width="2" height="2" rx="0.3" fill="#030712" />
-            ))}
-          </svg>
+          <img
+            src={qrUrl}
+            alt="Ticket QR code"
+            width={180}
+            height={180}
+            style={{ display: 'block' }}
+          />
         </div>
 
-        <p className="text-xs text-slate-400">
-          Scan at any EventPulse vendor terminal
+        <p className="text-xs text-slate-400 mb-4">
+          Show this QR at the event entry gate
         </p>
 
         <div
-          className="mt-4 rounded-xl py-2 px-4 text-xs font-semibold"
+          className="rounded-xl py-2 px-4 text-xs font-semibold"
           style={{
             background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(168,85,247,0.2))',
             color: '#a5b4fc',
@@ -165,7 +155,7 @@ function QrModal({ balance, onClose }) {
 }
 
 /* ─── Ticket Card ───────────────────────────────────────── */
-function TicketCard({ ticket }) {
+function TicketCard({ ticket, onClick }) {
   const getThemeDetails = (tier) => {
     if (tier === 'VIP') return { color: 'from-indigo-500 to-purple-600', glow: 'rgba(99,102,241,0.15)' };
     if (tier === 'General') return { color: 'from-cyan-500 to-blue-600', glow: 'rgba(6,182,212,0.15)' };
@@ -187,6 +177,7 @@ function TicketCard({ ticket }) {
         border: '1px solid rgba(255,255,255,0.06)',
         boxShadow: `0 10px 30px -10px ${theme.glow}`,
       }}
+      onClick={onClick}
       onMouseEnter={e => {
         e.currentTarget.style.transform = 'translateY(-4px)';
         e.currentTarget.style.borderColor = 'rgba(99,102,241,0.2)';
@@ -253,6 +244,7 @@ export default function CustomerDashboard() {
   const [greeting, setGreeting] = useState('');
   const [notifCount] = useState(2);
   const [tickets, setTickets] = useState([]);
+  const [selectedTicket, setSelectedTicket] = useState(null); // for ticket QR modal
 
   useEffect(() => {
     const h = new Date().getHours();
@@ -306,7 +298,9 @@ export default function CustomerDashboard() {
         fontFamily: "'Plus Jakarta Sans', sans-serif",
       }}
     >
-      {showQr && <QrModal balance={walletBalance} onClose={() => setShowQr(false)} />}
+      {selectedTicket && (
+        <TicketQrModal ticket={selectedTicket} onClose={() => setSelectedTicket(null)} />
+      )}
 
       {/* ── Top Nav ── */}
       <header
@@ -465,7 +459,11 @@ export default function CustomerDashboard() {
             <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'thin' }}>
               {tickets.length > 0 ? (
                 tickets.map(t => (
-                  <TicketCard key={t._id} ticket={t} />
+                  <TicketCard
+                    key={t._id}
+                    ticket={t}
+                    onClick={() => setSelectedTicket(t)}
+                  />
                 ))
               ) : (
                 <div className="text-slate-500 py-6 text-sm">No tickets purchased yet.</div>
