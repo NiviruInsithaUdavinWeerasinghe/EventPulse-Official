@@ -185,3 +185,86 @@ export const scanEntryQr = async (req, res) => {
     return res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// ── POST /api/wallet/topup ──────────────────────────────────────────────────
+/**
+ * Top up the user's wallet balance after payment validation.
+ *
+ * Steps:
+ *  1. Validate top-up amount and paymentToken.
+ *  2. Find the user's Wallet.
+ *  3. Increment the balance (using Decimal128).
+ *  4. Write a TopUp transaction ledger entry.
+ *  5. Return updated wallet info.
+ */
+export const topUpWallet = async (req, res) => {
+  try {
+    const { amount, paymentToken } = req.body;
+
+    if (amount === undefined || amount === null) {
+      return res.status(400).json({ success: false, message: 'Top-up amount is required.' });
+    }
+
+    const numAmount = Number(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      return res.status(400).json({ success: false, message: 'Invalid top-up amount. Must be a positive number.' });
+    }
+
+    if (!paymentToken) {
+      return res.status(400).json({ success: false, message: 'Payment gateway validation token is required.' });
+    }
+
+    // Find the wallet
+    let wallet = await Wallet.findOne({ user: req.user.id });
+    if (!wallet) {
+      // Create wallet if it doesn't exist
+      wallet = await Wallet.create({ user: req.user.id });
+    }
+
+    if (wallet.status !== 'Active') {
+      return res.status(400).json({ success: false, message: `Wallet is currently ${wallet.status}. Top-up is not allowed.` });
+    }
+
+    const currentBalance = parseFloat(wallet.balance.toString());
+    const newBalance = currentBalance + numAmount;
+
+    // Update wallet balance
+    wallet.balance = mongoose.Types.Decimal128.fromString(newBalance.toFixed(2));
+    await wallet.save();
+
+    // Create ledger entry
+    await WalletLedger.create({
+      wallet: wallet._id,
+      transactionType: 'Credit',
+      amount: mongoose.Types.Decimal128.fromString(numAmount.toFixed(2)),
+      balanceBefore: mongoose.Types.Decimal128.fromString(currentBalance.toFixed(2)),
+      balanceAfter: mongoose.Types.Decimal128.fromString(newBalance.toFixed(2)),
+      description: 'Online top-up via card/payment gateway',
+      referenceType: 'TopUp',
+      referenceId: paymentToken,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Wallet balance topped up successfully.',
+      wallet: {
+        walletId: wallet._id,
+        accountId: deriveWalletAccountId(req.user.id),
+        userId: wallet.user,
+        balance: wallet.balance.toString(),
+        currency: wallet.currency,
+        status: wallet.status,
+      },
+      transaction: {
+        amount: numAmount,
+        type: 'credit',
+        status: 'completed',
+        timestamp: new Date()
+      }
+    });
+  } catch (err) {
+    console.error('topUpWallet error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
