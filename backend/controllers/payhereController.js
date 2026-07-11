@@ -1,5 +1,8 @@
 import crypto from 'crypto';
 import dotenv from 'dotenv';
+import mongoose from 'mongoose';
+import Wallet from '../models/Wallet.js';
+import WalletLedger from '../models/WalletLedger.js';
 dotenv.config();
 
 const MERCHANT_ID     = process.env.PAYHERE_MERCHANT_ID;
@@ -110,4 +113,71 @@ export const verifyPayHereSignature = (payload) => {
     .toUpperCase();
 
   return localSig === md5sig;
+};
+
+/**
+ * EP-58: Webhook callback handler to process successful external gateway deposits.
+ * Triggered by PayHere server on successful payments.
+ */
+export const processPayHereNotification = async (req, res) => {
+  try {
+    const payload = req.body;
+
+    // Verify signature
+    if (!verifyPayHereSignature(payload)) {
+      console.warn('PayHere webhook signature mismatch:', payload);
+      return res.status(400).json({ success: false, message: 'Invalid signature.' });
+    }
+
+    const { order_id, payhere_amount, status_code, payment_id } = payload;
+
+    // Status code '2' represents Success in PayHere
+    if (status_code === '2') {
+      // Parse userId from order_id (Format: TOPUP-${userId}-${Date.now()})
+      const parts = order_id.split('-');
+      if (parts.length < 2 || parts[0] !== 'TOPUP') {
+        return res.status(400).json({ success: false, message: 'Invalid order ID format.' });
+      }
+      const userId = parts[1];
+      const amount = parseFloat(payhere_amount);
+
+      if (isNaN(amount) || amount <= 0) {
+        return res.status(400).json({ success: false, message: 'Invalid payment amount.' });
+      }
+
+      // Find or create wallet for user
+      let wallet = await Wallet.findOne({ user: userId });
+      if (!wallet) {
+        wallet = await Wallet.create({ user: userId });
+      }
+
+      const currentBalance = parseFloat(wallet.balance.toString());
+      const newBalance = currentBalance + amount;
+
+      // Update wallet balance
+      wallet.balance = mongoose.Types.Decimal128.fromString(newBalance.toFixed(2));
+      await wallet.save();
+
+      // Create ledger entry
+      await WalletLedger.create({
+        wallet: wallet._id,
+        transactionType: 'Credit',
+        amount: mongoose.Types.Decimal128.fromString(amount.toFixed(2)),
+        balanceBefore: mongoose.Types.Decimal128.fromString(currentBalance.toFixed(2)),
+        balanceAfter: mongoose.Types.Decimal128.fromString(newBalance.toFixed(2)),
+        description: 'Online top-up via card/payment gateway (Webhook)',
+        referenceType: 'TopUp',
+        referenceId: payment_id || order_id,
+      });
+
+      console.log(`Successfully processed PayHere deposit of LKR ${amount} for user ${userId}`);
+    } else {
+      console.log(`PayHere webhook received non-success status: ${status_code} for order ${order_id}`);
+    }
+
+    return res.status(200).send('OK');
+  } catch (error) {
+    console.error('processPayHereNotification error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
 };
