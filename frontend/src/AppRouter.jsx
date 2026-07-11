@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate as useRouteNavigator } from 'react-router-dom';
 import Navbar from './components/Navbar.jsx';
+import { useTheme } from './context/ThemeContext.jsx';
 import App from './App.jsx';
 import EventsPage from './pages/EventsPage.jsx';
 import CreateEvent from './pages/CreateEvent.jsx';
@@ -61,8 +62,13 @@ function RoleRedirect() {
 
 // ─── Auth layout wrapper ─────────────────────────────────────────────────────
 function AuthLayout({ children }) {
+  const { isDarkMode } = useTheme();
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#030712] p-6">
+    <div className={`min-h-screen flex items-center justify-center p-6 transition-colors duration-300 ${
+      isDarkMode 
+        ? 'bg-[#030712] text-white' 
+        : 'bg-[#f8fafc] text-slate-900'
+    }`}>
       {children}
     </div>
   );
@@ -72,9 +78,7 @@ function AuthLayout({ children }) {
 function MainLayout({ children, currentPage, onNavigate }) {
   return (
     <div>
-      <div className="max-w-[1200px] mx-auto px-6">
-        <Navbar currentPage={currentPage} onNavigate={onNavigate} />
-      </div>
+      <Navbar currentPage={currentPage} onNavigate={onNavigate} />
       {children}
     </div>
   );
@@ -136,14 +140,18 @@ export default function AppRouter() {
       {/* Vendor routes (EP-76) */}
       <Route path="/vendor/portal" element={
         <ProtectedRoute allowedRoles={['vendor']}>
-          <VendorPortal />
+          <MainLayout currentPage="vendor-portal" onNavigate={handleNavigate}>
+            <VendorPortal />
+          </MainLayout>
         </ProtectedRoute>
       } />
 
       {/* Customer routes */}
       <Route path="/customer/dashboard" element={
         <ProtectedRoute allowedRoles={['customer']}>
-          <CustomerDashboard />
+          <MainLayout currentPage="customer-dashboard" onNavigate={handleNavigate}>
+            <CustomerDashboard />
+          </MainLayout>
         </ProtectedRoute>
       } />
       <Route path="/customer/list" element={
