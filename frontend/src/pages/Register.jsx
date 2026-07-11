@@ -2,8 +2,10 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { User, Mail, Lock, Phone, ArrowRight, Sparkles } from "lucide-react";
 import { GoogleLogin } from "@react-oauth/google";
+import { useTheme } from "../context/ThemeContext.jsx";
 
 export default function Register() {
+  const { isDarkMode } = useTheme();
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -109,19 +111,19 @@ export default function Register() {
   ];
 
   return (
-    <div className="w-full max-w-[480px] my-8 px-8 py-10 rounded-3xl border border-white/10 bg-white/[0.02] shadow-[0_20px_50px_rgba(0,0,0,0.5)] backdrop-blur-xl relative overflow-hidden transition-all duration-300">
+    <div className="w-full max-w-[480px] my-8 px-8 py-10 rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/[0.02] shadow-xl dark:shadow-[0_20px_50px_rgba(0,0,0,0.5)] backdrop-blur-xl relative overflow-hidden transition-all duration-300">
       {/* Background radial soft light overlay */}
       <div className="absolute -top-24 -left-24 w-48 h-48 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
       <div className="absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-purple-500/10 blur-3xl pointer-events-none" />
 
       <div className="text-center mb-8 relative z-10">
         <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 mb-4">
-          <Sparkles className="text-indigo-400" size={22} />
+          <Sparkles className="text-indigo-500 dark:text-indigo-400" size={22} />
         </div>
-        <h2 className="text-3xl font-extrabold text-white tracking-tight mb-2">
+        <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-2">
           Create Your Account
         </h2>
-        <p className="text-slate-400 text-sm">
+        <p className="text-slate-550 dark:text-slate-400 text-sm font-semibold">
           Join EventPulse and coordinate/explore events.
         </p>
       </div>
@@ -130,16 +132,16 @@ export default function Register() {
 
         {/* Full Name */}
         <div className="space-y-2">
-          <label htmlFor="fullName" className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
+          <label htmlFor="fullName" className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
             Full Name
           </label>
           <div className="relative group">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500 group-focus-within:text-indigo-400 transition-colors">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-500 transition-colors">
               <User size={18} />
             </div>
             <input
               id="fullName" type="text" value={formData.fullName} onChange={handleChange}
-              className="w-full pl-11 pr-4 py-3 bg-white/[0.03] border border-white/[0.08] rounded-xl focus:border-indigo-500 focus:shadow-[0_0_0_2px_rgba(99,102,241,0.2)] text-white placeholder-slate-500 transition-all duration-200 outline-none"
+              className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/[0.08] rounded-xl focus:border-indigo-500 focus:shadow-[0_0_0_2px_rgba(99,102,241,0.2)] text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 outline-none"
               placeholder="Enter your full name" required
             />
           </div>
@@ -147,16 +149,16 @@ export default function Register() {
 
         {/* Email */}
         <div className="space-y-2">
-          <label htmlFor="email" className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
+          <label htmlFor="email" className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
             Email Address
           </label>
           <div className="relative group">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500 group-focus-within:text-indigo-400 transition-colors">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-500 transition-colors">
               <Mail size={18} />
             </div>
             <input
               id="email" type="email" value={formData.email} onChange={handleChange}
-              className="w-full pl-11 pr-4 py-3 bg-white/[0.03] border border-white/[0.08] rounded-xl focus:border-indigo-500 focus:shadow-[0_0_0_2px_rgba(99,102,241,0.2)] text-white placeholder-slate-500 transition-all duration-200 outline-none"
+              className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/[0.08] rounded-xl focus:border-indigo-500 focus:shadow-[0_0_0_2px_rgba(99,102,241,0.2)] text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 outline-none"
               placeholder="Enter your email" required
             />
           </div>
@@ -164,16 +166,16 @@ export default function Register() {
 
         {/* Phone */}
         <div className="space-y-2">
-          <label htmlFor="phone" className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
+          <label htmlFor="phone" className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
             Phone Number
           </label>
           <div className="relative group">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500 group-focus-within:text-indigo-400 transition-colors">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-500 transition-colors">
               <Phone size={18} />
             </div>
             <input
               id="phone" type="tel" value={formData.phone} onChange={handleChange}
-              className="w-full pl-11 pr-4 py-3 bg-white/[0.03] border border-white/[0.08] rounded-xl focus:border-indigo-500 focus:shadow-[0_0_0_2px_rgba(99,102,241,0.2)] text-white placeholder-slate-500 transition-all duration-200 outline-none"
+              className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/[0.08] rounded-xl focus:border-indigo-500 focus:shadow-[0_0_0_2px_rgba(99,102,241,0.2)] text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 outline-none"
               placeholder="Enter your phone number" required
             />
           </div>
@@ -181,7 +183,7 @@ export default function Register() {
 
         {/* Role selector */}
         <div className="space-y-2">
-          <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
+          <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
             I am a...
           </label>
           <div className="grid grid-cols-3 gap-2">
@@ -192,8 +194,8 @@ export default function Register() {
                 onClick={() => setFormData((prev) => ({ ...prev, role: value }))}
                 className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-center transition-all duration-200 cursor-pointer
                   ${formData.role === value
-                    ? "border-indigo-500 bg-indigo-500/10 text-indigo-400 shadow-md shadow-indigo-500/5"
-                    : "border-white/10 text-slate-400 hover:border-indigo-500/30 hover:text-indigo-300 bg-white/[0.01]"
+                    ? "border-indigo-500 bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 shadow-md shadow-indigo-500/5"
+                    : "border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:border-indigo-500/30 hover:text-indigo-600 dark:hover:text-indigo-300 bg-slate-50 dark:bg-white/[0.01]"
                   }`}
               >
                 <span className="text-xl">{icon}</span>
@@ -206,16 +208,16 @@ export default function Register() {
 
         {/* Password */}
         <div className="space-y-2">
-          <label htmlFor="password" className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
+          <label htmlFor="password" className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
             Password
           </label>
           <div className="relative group">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500 group-focus-within:text-indigo-400 transition-colors">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-500 transition-colors">
               <Lock size={18} />
             </div>
             <input
               id="password" type="password" value={formData.password} onChange={handleChange}
-              className="w-full pl-11 pr-4 py-3 bg-white/[0.03] border border-white/[0.08] rounded-xl focus:border-indigo-500 focus:shadow-[0_0_0_2px_rgba(99,102,241,0.2)] text-white placeholder-slate-500 transition-all duration-200 outline-none"
+              className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/[0.08] rounded-xl focus:border-indigo-500 focus:shadow-[0_0_0_2px_rgba(99,102,241,0.2)] text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 outline-none"
               placeholder="Create a password" required
             />
           </div>
@@ -223,16 +225,16 @@ export default function Register() {
 
         {/* Confirm Password */}
         <div className="space-y-2">
-          <label htmlFor="confirmPassword" className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
+          <label htmlFor="confirmPassword" className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
             Confirm Password
           </label>
           <div className="relative group">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500 group-focus-within:text-indigo-400 transition-colors">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-500 transition-colors">
               <Lock size={18} />
             </div>
             <input
               id="confirmPassword" type="password" value={formData.confirmPassword} onChange={handleChange}
-              className="w-full pl-11 pr-4 py-3 bg-white/[0.03] border border-white/[0.08] rounded-xl focus:border-indigo-500 focus:shadow-[0_0_0_2px_rgba(99,102,241,0.2)] text-white placeholder-slate-500 transition-all duration-200 outline-none"
+              className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/[0.08] rounded-xl focus:border-indigo-500 focus:shadow-[0_0_0_2px_rgba(99,102,241,0.2)] text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 outline-none"
               placeholder="Confirm your password" required
             />
           </div>
@@ -243,22 +245,22 @@ export default function Register() {
           <div className="relative flex items-center justify-center mt-0.5">
             <input
               type="checkbox" required
-              className="peer shrink-0 appearance-none w-4.5 h-4.5 border border-white/10 rounded bg-white/[0.02] checked:bg-indigo-500 checked:border-indigo-500 focus:outline-none transition-all"
+              className="peer shrink-0 appearance-none w-4.5 h-4.5 border border-slate-200 dark:border-white/10 rounded bg-slate-50 dark:bg-white/[0.02] checked:bg-indigo-500 checked:border-indigo-500 focus:outline-none transition-all"
             />
             <svg className="absolute w-3.5 h-3.5 pointer-events-none opacity-0 peer-checked:opacity-100 text-white fill-current transition-opacity" viewBox="0 0 20 20">
               <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
             </svg>
           </div>
-          <span className="text-sm text-slate-400 group-hover:text-slate-200 transition-colors leading-relaxed">
+          <span className="text-sm text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors leading-relaxed">
             I agree to the{" "}
-            <a href="#terms" className="text-indigo-400 hover:underline">Terms & Conditions</a>{" "}
+            <a href="#terms" className="text-indigo-550 dark:text-indigo-400 hover:underline">Terms & Conditions</a>{" "}
             and{" "}
-            <a href="#privacy" className="text-indigo-400 hover:underline">Privacy Policy</a>
+            <a href="#privacy" className="text-indigo-550 dark:text-indigo-400 hover:underline">Privacy Policy</a>
           </span>
         </label>
 
         {error && (
-          <p className="text-sm text-red-400 text-center font-medium bg-red-500/10 border border-red-500/20 py-2.5 rounded-xl">{error}</p>
+          <p className="text-sm text-red-500 dark:text-red-400 text-center font-medium bg-red-500/10 border border-red-500/20 py-2.5 rounded-xl">{error}</p>
         )}
 
         <button
@@ -271,8 +273,8 @@ export default function Register() {
       </form>
 
       <div className="mt-8 mb-6 relative flex items-center justify-center z-10">
-        <div className="absolute w-full border-t border-white/5"></div>
-        <div className="relative px-4 text-xs font-semibold text-slate-500 bg-[#030712] uppercase tracking-wider">
+        <div className="absolute w-full border-t border-slate-200 dark:border-white/5"></div>
+        <div className="relative px-4 text-xs font-semibold text-slate-500 bg-white dark:bg-[#030712] uppercase tracking-wider">
           Or continue with
         </div>
       </div>
@@ -281,23 +283,23 @@ export default function Register() {
         <GoogleLogin
           onSuccess={handleGoogleSuccess}
           onError={() => setError("Google registration failed. Please try again.")}
-          theme="filled_dark"
+          theme={isDarkMode ? "filled_dark" : "outline"}
           shape="pill"
         />
       </div>
 
-      <div className="mt-8 text-center text-sm text-slate-400 z-10 relative">
+      <div className="mt-8 text-center text-sm text-slate-550 dark:text-slate-400 z-10 relative">
         Already have an account?{" "}
-        <Link to="/login" className="font-semibold text-indigo-400 hover:text-indigo-300 transition-colors">
+        <Link to="/login" className="font-semibold text-indigo-550 dark:text-indigo-400 hover:text-indigo-650 dark:hover:text-indigo-300 transition-colors">
           Sign In
         </Link>
       </div>
 
       {showRoleModal && (
-        <div className="fixed inset-0 bg-[#030712]/90 backdrop-blur-md flex items-center justify-center z-[2000] p-6 animate-fade-in">
-          <div className="bg-[#0b0f19] border border-white/10 rounded-3xl p-8 w-full max-w-[440px] shadow-2xl relative animate-slide-up text-center">
-            <h3 className="text-2xl font-extrabold text-white mb-2">Select Your Role</h3>
-            <p className="text-slate-400 text-sm mb-6">Please choose your account type to continue registration</p>
+        <div className="fixed inset-0 bg-slate-900/60 dark:bg-[#030712]/90 backdrop-blur-md flex items-center justify-center z-[2000] p-6 animate-fade-in">
+          <div className="bg-white dark:bg-[#0b0f19] border border-slate-200 dark:border-white/10 rounded-3xl p-8 w-full max-w-[440px] shadow-2xl relative animate-slide-up text-center">
+            <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white mb-2">Select Your Role</h3>
+            <p className="text-slate-550 dark:text-slate-400 text-sm mb-6">Please choose your account type to continue registration</p>
             <div className="flex flex-col gap-3">
               {[
                 { value: "customer", label: "Customer", desc: "Browse events & explore layouts", icon: "🎟️" },
@@ -307,11 +309,11 @@ export default function Register() {
                 <button
                   key={roleOption.value}
                   onClick={() => handleRoleSelection(roleOption.value)}
-                  className="flex items-center gap-4 p-4 rounded-2xl border border-white/10 bg-white/[0.02] text-left hover:border-indigo-500 hover:bg-indigo-500/5 transition-all duration-200 cursor-pointer group"
+                  className="flex items-center gap-4 p-4 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.02] text-left hover:border-indigo-500 hover:bg-indigo-500/5 transition-all duration-200 cursor-pointer group"
                 >
                   <span className="text-2xl">{roleOption.icon}</span>
                   <div className="flex-1">
-                    <p className="text-sm font-bold text-white group-hover:text-indigo-400 transition-colors">{roleOption.label}</p>
+                    <p className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-indigo-500 transition-colors">{roleOption.label}</p>
                     <p className="text-xs text-slate-500 leading-tight mt-0.5">{roleOption.desc}</p>
                   </div>
                 </button>

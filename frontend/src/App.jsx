@@ -22,25 +22,25 @@ export default function App() {
         <div className="bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 px-4 py-1.5 rounded-full text-sm font-semibold tracking-widest uppercase mb-8">
           Official Release
         </div>
-        <h1 className="text-[4rem] font-extrabold leading-[1.15] m-0 mb-6 gradient-text-hero max-w-[800px] max-[768px]:text-[2.75rem]">
+        <h1 className="text-[4rem] font-extrabold leading-[1.15] m-0 mb-6 bg-gradient-to-br from-slate-900 to-slate-650 bg-clip-text text-transparent dark:from-white dark:to-slate-400 max-w-[800px] max-[768px]:text-[2.75rem]">
           Coordinate Next-Gen Events With{' '}
-          <span className="gradient-text-accent">Dynamic Mapping</span>
+          <span className="bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">Dynamic Mapping</span>
         </h1>
-        <p className="text-slate-400 text-xl max-w-[640px] m-0 mb-10 leading-relaxed">
+        <p className="text-slate-600 dark:text-slate-400 text-xl max-w-[640px] m-0 mb-10 leading-relaxed">
           The ultimate platform for exhibition coordinators and attendees. Design clickable layouts, manage stalls in real time, and streamline floorplan navigation with premium efficiency.
         </p>
         <div className="flex gap-4 flex-wrap justify-center">
           <button onClick={openDemoModal} className="btn-gradient text-white border-none px-7 py-3.5 text-base font-semibold rounded-lg cursor-pointer font-[inherit] transition-all duration-200">
             Get Started
           </button>
-          <a href="#features" className="bg-white/[0.03] text-slate-50 border border-white/10 px-7 py-3.5 text-base font-semibold rounded-lg no-underline inline-flex items-center justify-center hover:bg-white/[0.08] hover:border-white/20 transition-all duration-200">
+          <a href="#features" className="bg-slate-100 dark:bg-white/[0.03] text-slate-900 dark:text-slate-50 border border-slate-200 dark:border-white/10 px-7 py-3.5 text-base font-semibold rounded-lg no-underline inline-flex items-center justify-center hover:bg-slate-200 dark:hover:bg-white/[0.08] hover:border-slate-350 dark:hover:border-white/20 transition-all duration-200">
             Learn More
           </a>
         </div>
       </section>
 
       {/* ── Stats ──────────────────────────────────────── */}
-      <section id="stats" className="flex justify-around flex-wrap gap-12 px-8 py-16 bg-white/[0.01] border border-white/[0.03] rounded-3xl my-16">
+      <section id="stats" className="flex justify-around flex-wrap gap-12 px-8 py-16 bg-slate-50 dark:bg-white/[0.01] border border-slate-200 dark:border-white/[0.03] rounded-3xl my-16">
         {[
           { number: '10K+', label: 'Events Managed' },
           { number: '500K+', label: 'Stalls Configured' },
@@ -48,14 +48,14 @@ export default function App() {
         ].map(({ number, label }) => (
           <div key={label} className="text-center">
             <div className="text-5xl font-extrabold gradient-text-brand mb-2">{number}</div>
-            <div className="text-slate-500 text-sm uppercase tracking-widest font-semibold">{label}</div>
+            <div className="text-slate-600 dark:text-slate-550 text-sm uppercase tracking-widest font-semibold">{label}</div>
           </div>
         ))}
       </section>
 
       {/* ── Features ───────────────────────────────────── */}
       <section id="features" className="py-20">
-        <h2 className="text-center text-[2.25rem] font-bold text-slate-50 mb-12">
+        <h2 className="text-center text-[2.25rem] font-bold text-slate-900 dark:text-slate-50 mb-12">
           Designed for Seamless Operations
         </h2>
         <div className="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-8">
@@ -66,20 +66,20 @@ export default function App() {
           ].map(({ icon, title, desc }) => (
             <div
               key={title}
-              className="bg-white/[0.02] border border-white/5 rounded-2xl p-10 transition-all duration-300 cursor-default hover:-translate-y-2 hover:border-indigo-500/20 hover:shadow-[0_10px_30px_-10px_rgba(99,102,241,0.15)]"
+              className="bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 rounded-2xl p-10 transition-all duration-300 cursor-default hover:-translate-y-2 hover:border-indigo-500/20 hover:shadow-[0_10px_30px_-10px_rgba(99,102,241,0.15)]"
             >
               <div className="bg-indigo-500/10 text-indigo-400 w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-6">
                 {icon}
               </div>
-              <h3 className="text-xl font-semibold m-0 mb-3 text-slate-50">{title}</h3>
-              <p className="text-slate-400 leading-relaxed m-0 text-[0.95rem]">{desc}</p>
+              <h3 className="text-xl font-semibold m-0 mb-3 text-slate-900 dark:text-slate-50">{title}</h3>
+              <p className="text-slate-600 dark:text-slate-400 leading-relaxed m-0 text-[0.95rem]">{desc}</p>
             </div>
           ))}
         </div>
       </section>
 
       {/* ── Footer ─────────────────────────────────────── */}
-      <footer className="text-center py-12 text-slate-600 text-sm border-t border-white/5">
+      <footer className="text-center py-12 text-slate-500 dark:text-slate-600 text-sm border-t border-slate-200 dark:border-white/5">
         &copy; {new Date().getFullYear()} EventPulse. All rights reserved.
       </footer>
 

@@ -53,8 +53,8 @@ export default function EventsPage({ onNavigate }) {
         <div className="inline-block bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 px-4 py-1.5 rounded-full text-xs font-semibold tracking-widest uppercase mb-5">
           Venue Events
         </div>
-        <h1 className="text-4xl font-extrabold gradient-text-hero m-0 mb-4">Events</h1>
-        <p className="text-slate-500 text-base max-w-md mx-auto leading-relaxed mb-7">
+        <h1 className="text-4xl font-extrabold bg-gradient-to-br from-slate-900 to-slate-650 bg-clip-text text-transparent dark:from-white dark:to-slate-400 m-0 mb-4">Events</h1>
+        <p className="text-slate-650 dark:text-slate-500 text-base max-w-md mx-auto leading-relaxed mb-7">
           Browse all events and explore their interactive floor maps.
         </p>
         {role === 'organizer' && (
@@ -106,7 +106,7 @@ export default function EventsPage({ onNavigate }) {
               key={event._id}
               id={`event-card-${event._id}`}
               to={`/events/${event._id}`}
-              className="bg-white/[0.02] border border-white/5 rounded-[18px] overflow-hidden cursor-pointer transition-all duration-300 hover:-translate-y-2 hover:border-indigo-500/30 hover:shadow-[0_16px_40px_-8px_rgba(99,102,241,0.2)] block group"
+              className="bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 rounded-[18px] overflow-hidden cursor-pointer transition-all duration-300 hover:-translate-y-2 hover:border-indigo-500/30 hover:shadow-[0_16px_40px_-8px_rgba(99,102,241,0.2)] block group"
             >
               {/* Banner */}
               <div className="relative h-52 overflow-hidden bg-[#0b0f19]">
@@ -117,17 +117,17 @@ export default function EventsPage({ onNavigate }) {
               </div>
               {/* Body */}
               <div className="p-5 pb-6">
-                <h3 className="text-base font-bold text-slate-50 m-0 mb-2 truncate">{event.name}</h3>
+                <h3 className="text-base font-bold text-slate-900 dark:text-slate-50 m-0 mb-2 truncate">{event.name}</h3>
                 {event.description && (
-                  <p className="text-sm text-slate-500 m-0 mb-4 leading-relaxed line-clamp-2">{event.description}</p>
+                  <p className="text-sm text-slate-650 dark:text-slate-500 m-0 mb-4 leading-relaxed line-clamp-2">{event.description}</p>
                 )}
                 <div className="flex items-center justify-between gap-2">
                   {formatDate(event.date) ? (
                     <span className="bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 px-3 py-1 rounded-full text-xs font-semibold">📅 {formatDate(event.date)}</span>
                   ) : (
-                    <span className="bg-white/[0.03] border border-white/5 text-slate-700 px-3 py-1 rounded-full text-xs font-semibold">No date set</span>
+                    <span className="bg-slate-100 dark:bg-white/[0.03] border border-slate-200 dark:border-white/5 text-slate-600 dark:text-slate-400 px-3 py-1 rounded-full text-xs font-semibold">No date set</span>
                   )}
-                  <span className="text-xs text-slate-700">Has floor map →</span>
+                  <span className="text-xs text-slate-400 dark:text-slate-700">Has floor map →</span>
                 </div>
               </div>
             </Link>
