@@ -432,7 +432,6 @@ export default function CustomerDashboard() {
   const navigate = useNavigate();
   const { isDarkMode } = useTheme();
   const [user, setUser] = useState(getUser);
-  const [showQr, setShowQr] = useState(false);
   const [showTopUp, setShowTopUp] = useState(false);
   const [walletBalance, setWalletBalance] = useState(0);
   const [greeting, setGreeting] = useState('');
@@ -639,7 +638,7 @@ export default function CustomerDashboard() {
             <div className="space-y-2 mt-6">
               <button
                 id="quick-pay-qr-btn"
-                onClick={() => setShowQr(true)}
+                onClick={() => navigate('/customer/wallet/pay')}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm text-white transition-all duration-200 cursor-pointer shadow-lg shadow-indigo-500/10"
                 style={{
                   background: 'linear-gradient(135deg,#6366f1,#7c3aed)',

@@ -4,6 +4,7 @@ import Wallet from '../models/Wallet.js';
 import WalletLedger from '../models/WalletLedger.js';
 import Ticket from '../models/Ticket.js';
 import User from '../models/User.js';
+import PaymentToken from '../models/PaymentToken.js';
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -268,3 +269,129 @@ export const topUpWallet = async (req, res) => {
   }
 };
 
+// ── POST /api/wallet/token/generate ───────────────────────────────────────────
+/**
+ * EP-59 / EP-60 / EP-61 (US-403)
+ *
+ * Generates a fresh single-use, 60-second payment QR token for the authenticated customer.
+ *
+ * Steps:
+ *  1. Resolve the customer's Wallet (create if missing).
+ *  2. Bulk-expire any previously Active tokens for this wallet (EP-61 invalidation).
+ *  3. Generate a cryptographically secure 64-char hex token string.
+ *  4. Persist a new PaymentToken doc with expiresAt = now + 60 000ms.
+ *  5. Return { token, expiresAt, walletId, balance, currency }.
+ */
+export const generatePaymentToken = async (req, res) => {
+  try {
+    // Resolve wallet
+    let wallet = await Wallet.findOne({ user: req.user.id });
+    if (!wallet) {
+      wallet = await Wallet.create({ user: req.user.id });
+    }
+
+    if (wallet.status !== 'Active') {
+      return res.status(400).json({
+        success: false,
+        message: `Wallet is currently ${wallet.status}. Payment QR cannot be generated.`,
+      });
+    }
+
+    // EP-61: Expire all previously Active tokens for this wallet before issuing a new one
+    await PaymentToken.updateMany(
+      { wallet: wallet._id, status: 'Active' },
+      { $set: { status: 'Expired' } }
+    );
+
+    // EP-59: Generate a cryptographically secure token string
+    const tokenString = crypto.randomBytes(32).toString('hex');
+
+    // EP-60: Set TTL to exactly 60 seconds from now
+    const expiresAt = new Date(Date.now() + 60_000);
+
+    const paymentToken = await PaymentToken.create({
+      wallet: wallet._id,
+      user: req.user.id,
+      token: tokenString,
+      expiresAt,
+      status: 'Active',
+    });
+
+    return res.status(201).json({
+      success: true,
+      token: paymentToken.token,
+      expiresAt: paymentToken.expiresAt,
+      tokenId: paymentToken._id,
+      wallet: {
+        walletId: wallet._id,
+        balance: wallet.balance.toString(),
+        currency: wallet.currency,
+      },
+    });
+  } catch (err) {
+    console.error('generatePaymentToken error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ── GET /api/wallet/token/active ──────────────────────────────────────────────
+/**
+ * EP-60 (US-403)
+ *
+ * Returns the currently Active payment token for the authenticated customer's wallet,
+ * or null if no valid (non-expired) token exists.
+ *
+ * Also performs lazy expiry: if the most recent Active token has passed its expiresAt,
+ * its status is updated to Expired before returning null.
+ */
+export const getActiveToken = async (req, res) => {
+  try {
+    const wallet = await Wallet.findOne({ user: req.user.id });
+    if (!wallet) {
+      return res.status(200).json({ success: true, token: null, balance: '0.00' });
+    }
+
+    // Fetch the most recently created Active token for this wallet
+    const pt = await PaymentToken.findOne(
+      { wallet: wallet._id, status: 'Active' },
+      null,
+      { sort: { createdAt: -1 } }
+    );
+
+    if (!pt) {
+      return res.status(200).json({
+        success: true,
+        token: null,
+        balance: wallet.balance.toString(),
+        currency: wallet.currency,
+      });
+    }
+
+    // Lazy expiry check: if the token's TTL has elapsed, mark it Expired
+    if (new Date() >= pt.expiresAt) {
+      pt.status = 'Expired';
+      await pt.save();
+      return res.status(200).json({
+        success: true,
+        token: null,
+        balance: wallet.balance.toString(),
+        currency: wallet.currency,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      token: pt.token,
+      expiresAt: pt.expiresAt,
+      tokenId: pt._id,
+      wallet: {
+        walletId: wallet._id,
+        balance: wallet.balance.toString(),
+        currency: wallet.currency,
+      },
+    });
+  } catch (err) {
+    console.error('getActiveToken error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
