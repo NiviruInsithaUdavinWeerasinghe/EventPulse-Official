@@ -223,3 +223,13 @@
   0%   { opacity: 0.9; transform: translateX(-50%) scaleY(0.45) scale(0.4); }
   100% { opacity: 0;   transform: translateX(-50%) scaleY(0.45) scale(2.2); }
 }
+
+@keyframes shrinkWidth {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+
+.animate-shrink-width {
+  animation: shrinkWidth linear forwards;
+}
+

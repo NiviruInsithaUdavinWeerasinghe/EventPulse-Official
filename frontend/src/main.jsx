@@ -6,6 +6,7 @@ import './index.css'
 import AppRouter from './AppRouter.jsx'
 
 import { ThemeProvider } from './context/ThemeContext.jsx'
+import { NotificationProvider } from './context/NotificationContext.jsx'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
@@ -13,9 +14,11 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
       <ThemeProvider>
-        <BrowserRouter>
-          <AppRouter />
-        </BrowserRouter>
+        <NotificationProvider>
+          <BrowserRouter>
+            <AppRouter />
+          </BrowserRouter>
+        </NotificationProvider>
       </ThemeProvider>
     </GoogleOAuthProvider>
   </StrictMode>,

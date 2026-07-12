@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext.jsx';
+import { useNotification } from '../context/NotificationContext.jsx';
 import {
   Ticket,
   Wallet,
@@ -434,15 +435,14 @@ function TopUpModal({ isOpen, onClose, onTopUpSuccess }) {
 export default function CustomerDashboard() {
   const navigate = useNavigate();
   const { isDarkMode } = useTheme();
+  const { walletBalance, setWalletBalance, activeAlert, updateBalance } = useNotification();
   const [user, setUser] = useState(getUser);
   const [showTopUp, setShowTopUp] = useState(false);
-  const [walletBalance, setWalletBalance] = useState(0);
   const [greeting, setGreeting] = useState('');
   const [notifCount] = useState(2);
   const [tickets, setTickets] = useState([]);
   const [selectedTicket, setSelectedTicket] = useState(null); // for ticket QR modal
-  const [activeAlert, setActiveAlert] = useState(null); // { type, message, amount, vendorName }
-
+  const [transactions, setTransactions] = useState([]);
 
   useEffect(() => {
     const h = new Date().getHours();
@@ -454,19 +454,8 @@ export default function CustomerDashboard() {
     if (user.id) {
       const loadDashboardData = async () => {
         try {
-          // Fetch updated wallet balance using init endpoint
-          const token = localStorage.getItem('token');
-          const userRes = await fetch(`/api/wallet/init`, {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            }
-          });
-          if (userRes.ok) {
-            const userData = await userRes.json();
-            setWalletBalance(parseFloat(userData.wallet.balance) || 0);
-          }
+          // Fetch updated wallet balance using context method
+          updateBalance();
 
           // Fetch real tickets
           const ticketsRes = await fetch(`/api/events/user/${user.id}/tickets`);
@@ -482,45 +471,30 @@ export default function CustomerDashboard() {
     }
   }, [user.id]);
 
+  // Re-fetch transaction history whenever a transaction occurs (activeAlert transitions to null)
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token || !user.id) return;
-
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${wsProtocol}//${window.location.hostname}:5000/?token=${token}`;
-    const ws = new WebSocket(wsUrl);
-
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'TX_REJECTED') {
-          setActiveAlert({
-            type: 'TX_REJECTED',
-            message: data.message || 'Insufficient Wallet Balance',
-            amount: data.amount,
-            timestamp: data.timestamp,
+    if (!activeAlert && user.id) {
+      const fetchHistory = async () => {
+        try {
+          const token = localStorage.getItem('token');
+          const historyRes = await fetch(`/api/wallet/history`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
           });
-        } else if (data.type === 'TX_SUCCESS') {
-          setActiveAlert({
-            type: 'TX_SUCCESS',
-            message: 'Payment Successful',
-            amount: data.amount,
-            vendorName: data.vendorName || 'Stall Vendor',
-            timestamp: data.timestamp,
-          });
-          if (data.remainingBalance !== undefined) {
-            setWalletBalance(data.remainingBalance);
+          if (historyRes.ok) {
+            const historyData = await historyRes.json();
+            if (historyData.success) {
+              setTransactions(historyData.transactions);
+            }
           }
+        } catch (err) {
+          console.error("Error fetching transactions history:", err);
         }
-      } catch (err) {
-        console.error('Error parsing WS message:', err);
-      }
-    };
-
-    return () => {
-      ws.close();
-    };
-  }, [user.id]);
+      };
+      fetchHistory();
+    }
+  }, [activeAlert, user.id]);
 
 
   const handleLogout = () => {
@@ -546,81 +520,11 @@ export default function CustomerDashboard() {
         <TicketQrModal ticket={selectedTicket} onClose={() => setSelectedTicket(null)} />
       )}
 
-      {activeAlert && (
-        <div
-          className="fixed inset-0 z-55 flex items-center justify-center p-4"
-          style={{ backdropFilter: 'blur(12px)', background: 'rgba(3,7,18,0.85)' }}
-          onClick={() => setActiveAlert(null)}
-        >
-          <div
-            className="relative w-full max-w-sm rounded-3xl p-7 text-center border bg-white dark:bg-gradient-to-br dark:from-[#0f1629] dark:to-[#0a0f1e] border-slate-200 dark:border-red-500/35 shadow-xl shadow-red-500/10 text-slate-800 dark:text-slate-100"
-            onClick={e => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setActiveAlert(null)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer"
-            >
-              <X size={18} />
-            </button>
-
-            {activeAlert.type === 'TX_REJECTED' ? (
-              <>
-                <div className="w-16 h-16 bg-red-500/10 border border-red-500/25 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
-                  <AlertTriangle className="w-10 h-10 text-red-500" />
-                </div>
-                <h2 className="text-xl font-extrabold text-red-555 dark:text-red-400 mb-2">Insufficient Balance</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
-                  A checkout request for <span className="font-bold text-slate-800 dark:text-slate-150">LKR {activeAlert.amount.toFixed(2)}</span> was declined due to insufficient funds in your wallet.
-                </p>
-                <div className="bg-red-500/5 border border-red-500/10 rounded-xl p-4 text-left text-xs mb-8 text-red-600 dark:text-red-300/80 leading-relaxed">
-                  <span className="font-bold">Suggested action:</span> Please tap the <strong>+ Top Up Wallet</strong> button on your dashboard to add more funds before retrying the checkout.
-                </div>
-                <button
-                  onClick={() => { setActiveAlert(null); setShowTopUp(true); }}
-                  className="w-full py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition-all cursor-pointer shadow-lg shadow-red-500/20"
-                >
-                  Top Up Now
-                </button>
-              </>
-            ) : (
-              <>
-                <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/25 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle className="w-10 h-10 text-emerald-400" />
-                </div>
-                <h2 className="text-xl font-extrabold text-slate-800 dark:text-slate-100 mb-1">Payment Successful</h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">Processed at {activeAlert.vendorName}</p>
-                <p className="text-3xl font-extrabold text-slate-800 dark:text-slate-55 mb-6">
-                  LKR {activeAlert.amount.toFixed(2)}
-                </p>
-                <div className="bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/[0.06] rounded-xl p-4 text-left text-xs mb-8 space-y-2 text-slate-500 dark:text-slate-400">
-                  <div className="flex justify-between">
-                    <span>Paid To:</span>
-                    <span className="font-bold text-slate-800 dark:text-slate-200">{activeAlert.vendorName}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Remaining Balance:</span>
-                    <span className="text-slate-850 dark:text-slate-200 font-bold">LKR {walletBalance.toLocaleString()}</span>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setActiveAlert(null)}
-                  className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold rounded-xl transition-all cursor-pointer shadow-lg shadow-emerald-500/20"
-                >
-                  Close Receipt
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
       <TopUpModal 
         isOpen={showTopUp} 
         onClose={() => setShowTopUp(false)} 
         onTopUpSuccess={(newBalance) => setWalletBalance(newBalance)} 
       />
-
-
 
       {/* ── Main ── */}
       <main className="max-w-6xl mx-auto px-6 py-10 space-y-10">
@@ -649,7 +553,7 @@ export default function CustomerDashboard() {
               id: 'stat-wallet',
               icon: Wallet,
               label: 'Wallet Balance',
-              value: `LKR ${walletBalance.toLocaleString()}`,
+              value: `LKR ${walletBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
               suffix: '',
               color: '#a855f7',
             },
@@ -745,7 +649,7 @@ export default function CustomerDashboard() {
 
               <p className="text-xs text-slate-550 dark:text-slate-500 mb-1">Available Balance</p>
               <p className="text-3xl font-extrabold text-slate-900 dark:text-white mb-0.5">
-                LKR {walletBalance.toLocaleString()}
+                LKR {walletBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
               </p>
               <p className="text-xs text-slate-550 dark:text-slate-500">≈ USD {(walletBalance / 300).toFixed(2)}</p>
             </div>
@@ -817,50 +721,55 @@ export default function CustomerDashboard() {
               divideColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
             }}
           >
-            {[
-              {
-                id: 'act-1',
-                icon: Ticket,
-                label: 'Ticket purchased — Neon Nights Music Festival',
-                time: '2 days ago',
-                color: '#6366f1',
-              },
-              {
-                id: 'act-2',
-                icon: Wallet,
-                label: 'Wallet top-up — LKR 5,000',
-                time: '3 days ago',
-                color: '#a855f7',
-              },
-              {
-                id: 'act-3',
-                icon: Clock,
-                label: 'Checked in — Tech Summit 2025',
-                time: '1 week ago',
-                color: '#06b6d4',
-              },
-            ].map((item, idx) => (
-              <div
-                key={item.id}
-                id={item.id}
-                className="flex items-center gap-4 px-5 py-4"
-                style={{
-                  borderColor: isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)',
-                  borderTopWidth: idx === 0 ? 0 : 1,
-                }}
-              >
-                <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-slate-200/50 dark:bg-white/[0.03]"
-                >
-                  <item.icon size={14} style={{ color: item.color }} />
-                </div>
-                <p className="flex-1 text-sm text-slate-700 dark:text-slate-300">{item.label}</p>
-                <span className="text-xs text-slate-500 dark:text-slate-600 flex-shrink-0">{item.time}</span>
-              </div>
-            ))}
+            {transactions.length > 0 ? (
+              transactions.map((item, idx) => {
+                const isCredit = item.transactionType === 'Credit';
+                const iconColor = isCredit ? '#10b981' : '#6366f1';
+                const formattedTime = new Date(item.createdAt).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                });
+
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-center gap-4 px-5 py-4"
+                    style={{
+                      borderColor: isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)',
+                      borderTopWidth: idx === 0 ? 0 : 1,
+                    }}
+                  >
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-slate-200/50 dark:bg-white/[0.03]"
+                    >
+                      <Wallet size={14} style={{ color: iconColor }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-slate-800 dark:text-slate-250 truncate">
+                        {item.description}
+                      </p>
+                      <p className="text-[10px] text-slate-400">
+                        {item.referenceType} • {isCredit ? 'Credit' : 'Debit'}
+                      </p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <span className={`text-sm font-extrabold ${isCredit ? 'text-emerald-500' : 'text-slate-900 dark:text-white'}`}>
+                        {isCredit ? '+' : '-'} LKR {item.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </span>
+                      <span className="text-[10px] text-slate-405 block mt-0.5">{formattedTime}</span>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-slate-500 py-6 text-sm text-center">No transaction logs available yet.</div>
+            )}
           </div>
         </div>
       </main>
     </div>
   );
 }
+

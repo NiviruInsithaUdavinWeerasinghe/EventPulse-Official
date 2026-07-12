@@ -6,6 +6,7 @@ import {
   topUpWallet,
   generatePaymentToken,
   getActiveToken,
+  getWalletHistory,
 } from '../controllers/walletController.js';
 
 const router = express.Router();
@@ -33,6 +34,11 @@ router.post('/token/generate', generatePaymentToken);
 // GET /api/wallet/token/active  (EP-60 — US-403)
 // Return the current Active token if one exists and hasn't expired, otherwise null.
 router.get('/token/active', getActiveToken);
+
+// GET /api/wallet/history (EP-19 — US-406-SUB-4)
+// Get attendee wallet transaction history log.
+router.get('/history', getWalletHistory);
+
 
 export default router;
 
