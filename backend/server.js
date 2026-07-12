@@ -12,6 +12,9 @@ import authRoutes from './routes/auth.js';
 import vendorRoutes from './routes/vendorRoutes.js';
 import payhereRoutes from './routes/payhereRoutes.js';
 import walletRoutes from './routes/walletRoutes.js';
+import settlementRoutes from './routes/settlementRoutes.js';
+import reconciliationRoutes from './routes/reconciliationRoutes.js';
+import exportRoutes from './routes/exportRoutes.js';
 
 // Connect to MongoDB
 connectDB();
@@ -38,6 +41,9 @@ app.get('/health', (req, res) => {
 // API Routes (EP-22 - Niviru)
 app.use('/api/events', eventRoutes);
 app.use('/api/vendors', vendorRoutes);
+app.use('/api/settlements', settlementRoutes);
+app.use('/api/reconciliation', reconciliationRoutes);
+app.use('/api/exports', exportRoutes);
 
 // Wallet service routes (customer-only — JWT + role guard applied inside walletRoutes)
 app.use('/api/wallet', walletRoutes);
@@ -47,4 +53,4 @@ app.use('/api/payhere', payhereRoutes);
 
 server.listen(PORT, () => {
   console.log(`EventPulse Official backend server running on port ${PORT}`);
-});
+});
