@@ -395,3 +395,39 @@ export const getActiveToken = async (req, res) => {
     return res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// ── GET /api/wallet/history ──────────────────────────────────────────────────
+/**
+ * Retrieve the transaction ledger history for the authenticated user's wallet.
+ */
+export const getWalletHistory = async (req, res) => {
+  try {
+    const wallet = await Wallet.findOne({ user: req.user.id });
+    if (!wallet) {
+      return res.status(200).json({ success: true, transactions: [] });
+    }
+
+    const ledgerEntries = await WalletLedger.find({ wallet: wallet._id })
+      .sort({ createdAt: -1 })
+      .limit(50);
+
+    return res.status(200).json({
+      success: true,
+      transactions: ledgerEntries.map(entry => ({
+        id: entry._id,
+        transactionType: entry.transactionType,
+        amount: parseFloat(entry.amount.toString()),
+        balanceBefore: parseFloat(entry.balanceBefore.toString()),
+        balanceAfter: parseFloat(entry.balanceAfter.toString()),
+        description: entry.description,
+        referenceType: entry.referenceType,
+        referenceId: entry.referenceId,
+        createdAt: entry.createdAt,
+      })),
+    });
+  } catch (err) {
+    console.error('getWalletHistory error:', err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
