@@ -22,6 +22,11 @@ const paymentTokenSchema = new mongoose.Schema(
       ref: 'User',
       required: [true, 'PaymentToken must reference a User'],
     },
+    eventId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Event',
+      default: null,
+    },
     // 64-char hex string: crypto.randomBytes(32).toString('hex')
     token: {
       type: String,
