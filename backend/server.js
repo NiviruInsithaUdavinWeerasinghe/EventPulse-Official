@@ -15,7 +15,7 @@ import walletRoutes from './routes/walletRoutes.js';
 import settlementRoutes from './routes/settlementRoutes.js';
 import reconciliationRoutes from './routes/reconciliationRoutes.js';
 import exportRoutes from './routes/exportRoutes.js';
-
+import vendorAdRoutes from './routes/vendorAdRoutes.js';
 // Connect to MongoDB
 connectDB();
 
@@ -54,3 +54,5 @@ app.use('/api/payhere', payhereRoutes);
 server.listen(PORT, () => {
   console.log(`EventPulse Official backend server running on port ${PORT}`);
 });
+
+app.use('/api/vendor-ads', vendorAdRoutes);
