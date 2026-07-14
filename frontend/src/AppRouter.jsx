@@ -22,6 +22,9 @@ import PaymentQR from './pages/PaymentQR.jsx';
 import VendorPOS from './pages/VendorPOS.jsx';
 import VendorAnalytics from './pages/VendorAnalytics.jsx';
 
+
+import VendorAdDashboard from './pages/VendorAdDashboard.jsx';
+
 // ─── Helper: decode JWT role from localStorage ──────────────────────────────
 function getRoleFromToken() {
   try {
@@ -236,9 +239,16 @@ export default function AppRouter() {
       <Route path="/map-viewer/:eventId" element={
         <MapViewerWrapper onNavigate={handleNavigate} />
       } />
+      <Route path="/vendor/ads" element={
+        <ProtectedRoute allowedRoles={['vendor']}>
+          <VendorAdDashboard />
+        </ProtectedRoute>
+      } />
 
       <Route path="*" element={<Navigate to="/" replace />} />
+      
     </Routes>
+    
   );
 }
 
