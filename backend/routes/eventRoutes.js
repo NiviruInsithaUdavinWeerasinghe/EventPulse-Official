@@ -10,7 +10,11 @@ import {
   updateEventZones,
   submitVendorApplication,
   getEventApplications,
-  updateApplicationStatus
+  updateApplicationStatus,
+  getEventSchedule,
+  createSubEvent,
+  updateSubEvent,
+  deleteSubEvent
 } from '../controllers/eventController.js';
 import { searchEventZones } from '../controllers/searchController.js';
 
@@ -29,5 +33,11 @@ router.get('/:id', getEventById);
 router.put('/:id', upload.fields([{ name: 'banner', maxCount: 1 }, { name: 'floorMap', maxCount: 1 }]), updateEvent);
 router.post('/:id/purchase', purchaseTicket);
 router.get('/user/:userId/tickets', getUserTickets);
+
+// Schedule (SubEvent) CRUD routes
+router.get('/:id/schedule', getEventSchedule);
+router.post('/:id/schedule', createSubEvent);
+router.put('/schedule/:subId', updateSubEvent);
+router.delete('/schedule/:subId', deleteSubEvent);
 
 export default router;

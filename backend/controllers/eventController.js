@@ -1,6 +1,7 @@
 import { v2 as cloudinary } from 'cloudinary';
 import { Readable } from 'stream';
 import Event from '../models/Event.js';
+import SubEvent from '../models/SubEvent.js';
 import VendorApplication from '../models/VendorApplication.js';
 import dotenv from 'dotenv';
 
@@ -308,3 +309,96 @@ export const updateApplicationStatus = async (req, res) => {
   }
 };
 
+// ── GET /api/events/:id/schedule ─────────────────────────────────────────────
+/**
+ * Retrieve all sub-events for a given event, sorted chronologically.
+ * No seeding — only real data created by organizers is returned.
+ */
+export const getEventSchedule = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const agendaItems = await SubEvent.find({ event: id }).sort({ start_time: 1 });
+
+    return res.status(200).json({ success: true, data: agendaItems });
+  } catch (error) {
+    console.error('getEventSchedule error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── POST /api/events/:id/schedule ────────────────────────────────────────────
+/**
+ * Create a new sub-event session for the given event (organizer only).
+ */
+export const createSubEvent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, start_time, end_time, stage, performer } = req.body;
+
+    if (!name || !start_time || !end_time || !stage) {
+      return res.status(400).json({ success: false, message: 'Name, start time, end time and stage are required.' });
+    }
+
+    const subEvent = await SubEvent.create({
+      event: id,
+      name,
+      description: description || '',
+      start_time: new Date(start_time),
+      end_time: new Date(end_time),
+      stage,
+      performer: performer || ''
+    });
+
+    return res.status(201).json({ success: true, data: subEvent });
+  } catch (error) {
+    console.error('createSubEvent error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── PUT /api/events/schedule/:subId ──────────────────────────────────────────
+/**
+ * Update an existing sub-event session (organizer only).
+ */
+export const updateSubEvent = async (req, res) => {
+  try {
+    const { subId } = req.params;
+    const { name, description, start_time, end_time, stage, performer } = req.body;
+
+    const subEvent = await SubEvent.findById(subId);
+    if (!subEvent) return res.status(404).json({ success: false, message: 'Session not found.' });
+
+    if (name)        subEvent.name        = name;
+    if (description !== undefined) subEvent.description = description;
+    if (start_time)  subEvent.start_time  = new Date(start_time);
+    if (end_time)    subEvent.end_time    = new Date(end_time);
+    if (stage)       subEvent.stage       = stage;
+    if (performer !== undefined) subEvent.performer = performer;
+
+    await subEvent.save();
+
+    return res.status(200).json({ success: true, data: subEvent });
+  } catch (error) {
+    console.error('updateSubEvent error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── DELETE /api/events/schedule/:subId ───────────────────────────────────────
+/**
+ * Delete a sub-event session (organizer only).
+ */
+export const deleteSubEvent = async (req, res) => {
+  try {
+    const { subId } = req.params;
+
+    const subEvent = await SubEvent.findByIdAndDelete(subId);
+    if (!subEvent) return res.status(404).json({ success: false, message: 'Session not found.' });
+
+    return res.status(200).json({ success: true, message: 'Session deleted.' });
+  } catch (error) {
+    console.error('deleteSubEvent error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
