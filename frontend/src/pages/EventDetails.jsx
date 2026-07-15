@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { CalendarDays, MapPin, Sparkles, ChevronRight, ArrowLeft } from 'lucide-react';
+import EventTimeline from '../components/EventTimeline.jsx';
 
 export default function EventDetails() {
   const { id } = useParams();
@@ -112,6 +113,8 @@ export default function EventDetails() {
               </div>
             </div>
           </div>
+
+          <EventTimeline eventId={id} />
         </div>
 
         {/* Purchase Card / Tier Selector - right column */}

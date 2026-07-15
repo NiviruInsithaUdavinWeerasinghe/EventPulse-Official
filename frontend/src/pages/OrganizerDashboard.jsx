@@ -30,6 +30,7 @@ import SettlementAudit from '../components/organizer/SettlementAudit.jsx';
 import SettingsView from '../components/organizer/SettingsView.jsx';
 import SupportView from '../components/organizer/SupportView.jsx';
 import CreateEvent from './CreateEvent.jsx';
+import ScheduleManager from '../components/organizer/ScheduleManager.jsx';
 
 export default function OrganizerDashboard() {
   const navigate = useNavigate();
@@ -124,10 +125,10 @@ export default function OrganizerDashboard() {
     { id: 3, type: 'audit', msg: "Tax commission checks completed for May.", time: "1 day ago", read: true },
   ];
 
-  // Navigation items mapping
   const mainNavs = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'events', label: 'Event Management', icon: Calendar },
+    { id: 'schedule', label: 'Schedule Manager', icon: Calendar },
     { id: 'blueprints', label: 'Blueprint / Map Uploads', icon: Map },
     { id: 'approvals', label: 'Vendor Approvals', icon: Users, badge: 2 },
     { id: 'settlements', label: 'Settlement Audit Panel', icon: DollarSign },
@@ -259,6 +260,8 @@ export default function OrganizerDashboard() {
         return <MainDashboard setActiveTab={setActiveTab} searchQuery={searchQuery} />;
       case 'events':
         return <EventManagement searchQuery={searchQuery} />;
+      case 'schedule':
+        return <ScheduleManager />;
       case 'create-event':
         return <CreateEvent onNavigate={(target) => navigate(`/organizer/dashboard/events`)} />;
       case 'edit-event':
