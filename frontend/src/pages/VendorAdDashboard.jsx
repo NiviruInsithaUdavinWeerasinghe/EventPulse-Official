@@ -3,27 +3,26 @@ import { MapPin, Trash2, Radio, Loader2, Plus, X, Target, AlertCircle } from 'lu
 
 /**
  * EP-126: Vendor Ad Dashboard UI
- * Lets a vendor create, view, toggle, and delete location-based ads
- * that trigger for attendees within a set GPS radius of their stall.
+ * Lets a vendor create, view, toggle, and delete proximity ads that trigger
+ * for attendees when the "me" marker (simulation mode) enters the radius
+ * around their approved stall on the interactive map.
  */
 export default function VendorAdDashboard() {
   const [ads, setAds] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isLocating, setIsLocating] = useState(false);
   const [toast, setToast] = useState(null);
 
-  // The vendor's approved stall — pulled automatically, no manual eventId needed
   const [approvedStall, setApprovedStall] = useState(null);
   const [isLoadingStall, setIsLoadingStall] = useState(true);
+
+  const MAX_MESSAGE_LENGTH = 100;
 
   const [form, setForm] = useState({
     title: '',
     message: '',
-    latitude: '',
-    longitude: '',
-    radiusMeters: 50,
+    radiusPx: 80,
   });
 
   const loggedInUser = (() => {
@@ -39,7 +38,6 @@ export default function VendorAdDashboard() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  // ── Find the vendor's approved stall application to get a real eventId ────
   const fetchApprovedStall = useCallback(async () => {
     if (!loggedInUser.id) return;
     try {
@@ -74,35 +72,8 @@ export default function VendorAdDashboard() {
     fetchAds();
   }, [fetchApprovedStall, fetchAds]);
 
-  // EP-126: Capture the vendor's current GPS position as the ad's geofence anchor
-  const handleUseCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      showToast('Geolocation is not supported on this device.', 'error');
-      return;
-    }
-    setIsLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setForm((prev) => ({
-          ...prev,
-          latitude: position.coords.latitude.toFixed(6),
-          longitude: position.coords.longitude.toFixed(6),
-        }));
-        setIsLocating(false);
-      },
-      () => {
-        showToast('Could not get your location. Check browser permissions.', 'error');
-        setIsLocating(false);
-      }
-    );
-  };
-
   const handleCreateAd = async (e) => {
     e.preventDefault();
-    if (!form.latitude || !form.longitude) {
-      showToast('Set your stall location before saving.', 'error');
-      return;
-    }
     if (!approvedStall) {
       showToast('You need an approved stall before creating ads.', 'error');
       return;
@@ -118,15 +89,13 @@ export default function VendorAdDashboard() {
           stallId: approvedStall.requestedStall,
           title: form.title,
           message: form.message,
-          latitude: parseFloat(form.latitude),
-          longitude: parseFloat(form.longitude),
-          radiusMeters: Number(form.radiusMeters),
+          radiusPx: Number(form.radiusPx),
         }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        showToast('Ad created! It will trigger for attendees nearby.');
-        setForm({ title: '', message: '', latitude: '', longitude: '', radiusMeters: 50 });
+        showToast('Ad created! It will trigger when attendees get close to your stall.');
+        setForm({ title: '', message: '', radiusPx: 80 });
         setIsFormOpen(false);
         fetchAds();
       } else {
@@ -175,7 +144,7 @@ export default function VendorAdDashboard() {
               Proximity Ads
             </h1>
             <p className="text-sm text-slate-500 mt-1">
-              Create location-based promotions that notify attendees when they're near your stall.
+              Attendees near your stall on the interactive map will see your ad pop up.
             </p>
           </div>
           <button
@@ -188,7 +157,6 @@ export default function VendorAdDashboard() {
           </button>
         </div>
 
-        {/* Warning if no approved stall yet */}
         {!isLoadingStall && !approvedStall && (
           <div className="flex items-start gap-3 p-4 mb-6 rounded-xl bg-amber-500/10 border border-amber-500/25">
             <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
@@ -198,7 +166,6 @@ export default function VendorAdDashboard() {
           </div>
         )}
 
-        {/* Ad list */}
         {isLoading ? (
           <div className="flex items-center justify-center py-16 text-slate-500">
             <Loader2 className="w-5 h-5 animate-spin mr-2" />
@@ -228,7 +195,7 @@ export default function VendorAdDashboard() {
                       {ad.isActive ? 'Active' : 'Paused'}
                     </span>
                     <span className="text-[0.65rem] text-slate-600 flex items-center gap-1">
-                      <MapPin className="w-3 h-3" /> {ad.radiusMeters}m radius
+                      <MapPin className="w-3 h-3" /> Stall {ad.stallId} &middot; {ad.radiusPx}px radius
                     </span>
                   </div>
                   <h3 className="text-sm font-bold text-slate-100">{ad.title}</h3>
@@ -274,7 +241,7 @@ export default function VendorAdDashboard() {
             <h2 className="text-lg font-bold text-white mb-1">New Proximity Ad</h2>
             {approvedStall && (
               <p className="text-xs text-slate-500 mb-4">
-                For stall <span className="text-indigo-400 font-semibold">{approvedStall.requestedStall}</span>
+                Auto-linked to your stall <span className="text-indigo-400 font-semibold">{approvedStall.requestedStall}</span>
               </p>
             )}
 
@@ -292,51 +259,41 @@ export default function VendorAdDashboard() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-400 block mb-1">Message</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-slate-400">Message</label>
+                  <span className={`text-[0.65rem] font-mono ${
+                    form.message.length >= MAX_MESSAGE_LENGTH ? 'text-rose-400' : 'text-slate-600'
+                  }`}>
+                    {form.message.length} / {MAX_MESSAGE_LENGTH}
+                  </span>
+                </div>
                 <textarea
                   required
                   rows="3"
+                  maxLength={MAX_MESSAGE_LENGTH}
                   placeholder="Come say hi and grab a discount at our stall!"
                   value={form.message}
-                  onChange={(e) => setForm({ ...form, message: e.target.value })}
+                  onChange={(e) => setForm({ ...form, message: e.target.value.slice(0, MAX_MESSAGE_LENGTH) })}
                   className="w-full bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500 resize-none"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-400 block mb-1">Stall Location</label>
-                <button
-                  type="button"
-                  onClick={handleUseCurrentLocation}
-                  disabled={isLocating}
-                  className="w-full flex items-center justify-center gap-2 py-2 bg-white/[0.03] border border-white/[0.08] rounded-lg text-sm text-indigo-300 hover:bg-white/[0.06] transition cursor-pointer disabled:opacity-50"
-                >
-                  {isLocating ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
-                  {isLocating ? 'Getting location...' : form.latitude ? 'Location set ✓' : 'Use my current location'}
-                </button>
-                {form.latitude && (
-                  <p className="text-[0.65rem] text-slate-600 mt-1 font-mono">
-                    {form.latitude}, {form.longitude}
-                  </p>
-                )}
-              </div>
-
-              <div>
                 <label className="text-xs font-semibold text-slate-400 block mb-1">
-                  Trigger Radius: {form.radiusMeters}m
+                  Trigger Radius: {form.radiusPx}px
                 </label>
                 <input
                   type="range"
-                  min="5"
-                  max="500"
-                  step="5"
-                  value={form.radiusMeters}
-                  onChange={(e) => setForm({ ...form, radiusMeters: e.target.value })}
+                  min="20"
+                  max="300"
+                  step="10"
+                  value={form.radiusPx}
+                  onChange={(e) => setForm({ ...form, radiusPx: e.target.value })}
                   className="w-full accent-indigo-500"
                 />
                 <div className="flex justify-between text-[0.6rem] text-slate-600 mt-1">
-                  <span>5m (very close)</span>
-                  <span>500m (wide area)</span>
+                  <span>20px (very close)</span>
+                  <span>300px (wide area)</span>
                 </div>
               </div>
 
@@ -352,7 +309,6 @@ export default function VendorAdDashboard() {
         </div>
       )}
 
-      {/* Toast */}
       {toast && (
         <div
           className={`fixed bottom-6 right-6 px-4 py-3 rounded-xl text-sm font-medium shadow-xl border z-[100] ${

@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 
 // EP-126/129/134: Location-based vendor advertisement
+// Anchored to the vendor's stall zone (x/y already stored on Event.zones) —
+// no separate GPS coordinates needed since the whole map runs on SVG units.
 const vendorAdSchema = new mongoose.Schema(
   {
     eventId: {
@@ -15,8 +17,8 @@ const vendorAdSchema = new mongoose.Schema(
     },
     stallId: {
       type: String,
+      required: [true, 'stallId is required — the ad is anchored to your approved stall.'],
       trim: true,
-      default: '',
     },
     title: {
       type: String,
@@ -28,24 +30,15 @@ const vendorAdSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Ad message is required'],
       trim: true,
-      maxlength: 200,
+      maxlength: 100,
     },
-    // Real-world GPS anchor point for the stall/shop
-    latitude: {
-      type: Number,
-      required: [true, 'Latitude is required'],
-    },
-    longitude: {
-      type: Number,
-      required: [true, 'Longitude is required'],
-    },
-    // Geofence trigger radius, in meters
-    radiusMeters: {
+    // Trigger radius in SVG map units (same coordinate space as userPosition/zone.center)
+    radiusPx: {
       type: Number,
       required: true,
-      default: 50,
-      min: 5,
-      max: 500,
+      default: 80,
+      min: 20,
+      max: 300,
     },
     isActive: {
       type: Boolean,
