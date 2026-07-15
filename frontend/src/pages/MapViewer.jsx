@@ -97,6 +97,8 @@ export default function MapViewer({ eventId: propEventId }) {
 
   // EP-22: Polygon selector — tracks the currently highlighted zone
   const [selectedStall, setSelectedStall] = useState(null);
+  const [displayedStall, setDisplayedStall] = useState(null);   // what is actually rendered (delayed removal)
+  const [isStallExiting, setIsStallExiting] = useState(false);  // triggers exit animation class
   const [isSimulationMode, setIsSimulationMode] = useState(false);
   const [activeNavigation, setActiveNavigation] = useState(null); // { id, name, center: { x, y } }
   const [zoneCrowdData, setZoneCrowdData]       = useState({}); // { [zoneId]: { count, capacity, state: "low"|"moderate"|"high" } }
@@ -104,6 +106,7 @@ export default function MapViewer({ eventId: propEventId }) {
   const [activeAlert, setActiveAlert]           = useState(null); // { zoneId, zoneName, recommendationId, recommendationName }
   const [crowdParticles, setCrowdParticles]     = useState([]); // Array of { id, x, y }
   const userDragRef                             = useRef(false);
+  const userDragOffsetRef                       = useRef({ x: 0, y: 0 });
   const particlesRef                            = useRef([]);
   const animationFrameIdRef                     = useRef(null);
 
@@ -118,6 +121,22 @@ export default function MapViewer({ eventId: propEventId }) {
   // ── EP-41/45/46: Auto-pan & flashing marker states ────────────────────────
   const [flashMarker, setFlashMarker] = useState(null); // { x, y } in SVG coords
   const panAnimRef = useRef(null);
+
+  // Sync selectedStall → displayedStall with exit-animation delay
+  useEffect(() => {
+    if (selectedStall) {
+      setIsStallExiting(false);
+      setDisplayedStall(selectedStall);
+    } else if (displayedStall) {
+      // Play exit animation, then unmount
+      setIsStallExiting(true);
+      const t = setTimeout(() => {
+        setDisplayedStall(null);
+        setIsStallExiting(false);
+      }, 190);
+      return () => clearTimeout(t);
+    }
+  }, [selectedStall]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Prefill vendor form when a vacant stall is clicked
   useEffect(() => {
@@ -337,6 +356,8 @@ export default function MapViewer({ eventId: propEventId }) {
         name: closestZone.name || closestZone.id,
         category: closestZone.category || "Uncategorised"
       });
+    } else {
+      setSelectedStall(null);
     }
   }, [isSimulationMode, userPosition, event]);
 
@@ -1104,6 +1125,7 @@ export default function MapViewer({ eventId: propEventId }) {
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < 20) {
           userDragRef.current = true;
+          userDragOffsetRef.current = { x: dx, y: dy };
           e.preventDefault();
           return;
         }
@@ -1124,7 +1146,10 @@ export default function MapViewer({ eventId: propEventId }) {
       if (rect) {
         const svgX = (e.clientX - rect.left - panRef.current.x) / scaleRef.current;
         const svgY = (e.clientY - rect.top  - panRef.current.y) / scaleRef.current;
-        setUserPosition({ x: svgX, y: svgY });
+        setUserPosition({ 
+          x: svgX - userDragOffsetRef.current.x, 
+          y: svgY - userDragOffsetRef.current.y 
+        });
       }
       return;
     }
@@ -1482,6 +1507,18 @@ export default function MapViewer({ eventId: propEventId }) {
                         className="group"
                         onMouseDown={(e) => {
                           e.stopPropagation();
+                          e.preventDefault();
+                          const rect = containerRef.current?.getBoundingClientRect();
+                          if (rect) {
+                            const svgX = (e.clientX - rect.left - panRef.current.x) / scaleRef.current;
+                            const svgY = (e.clientY - rect.top  - panRef.current.y) / scaleRef.current;
+                            userDragOffsetRef.current = {
+                              x: svgX - userPosition.x,
+                              y: svgY - userPosition.y
+                            };
+                          } else {
+                            userDragOffsetRef.current = { x: 0, y: 0 };
+                          }
                           userDragRef.current = true;
                         }}
                       >
@@ -1748,17 +1785,22 @@ export default function MapViewer({ eventId: propEventId }) {
           )}
 
           {/* ── Selected Stall Info Card (EP-43 — Mesanda) ───────────────── */}
-          {!isEditorMode && selectedStall && (() => {
-            const stallApp = stallApplicationMap[selectedStall.id.toLowerCase()];
+          {!isEditorMode && displayedStall && (() => {
+            const stallApp = stallApplicationMap[displayedStall.id.toLowerCase()];
             const isVendor = userRole === 'vendor';
             
             const myApp = applications.find(app => 
-              app.requestedStall.toLowerCase() === selectedStall.id.toLowerCase() && 
+              app.requestedStall.toLowerCase() === displayedStall.id.toLowerCase() && 
               (app.vendorId?._id === loggedInUser.id || app.vendorId === loggedInUser.id)
             );
 
             return (
-              <div className="flex flex-col gap-3.5 p-4 bg-white/[0.03] border border-white/[0.08] rounded-xl animate-scale-in relative">
+              <div
+                key="active-stall-card"
+                className={`flex flex-col gap-3.5 p-4 bg-white/[0.03] border border-white/[0.08] rounded-xl relative ${
+                  isStallExiting ? 'animate-scale-out' : 'animate-scale-in'
+                }`}
+              >
                 {/* Dismiss button — clears selection + removes orange glow on map */}
                 <button
                   onClick={() => setSelectedStall(null)}
@@ -1773,12 +1815,12 @@ export default function MapViewer({ eventId: propEventId }) {
                   <span
                     className="w-2.5 h-2.5 rounded-sm shrink-0"
                     style={{
-                      background: (CATEGORY_STYLES[selectedStall.category] || DEFAULT_ZONE_STYLE).stroke,
+                      background: (CATEGORY_STYLES[displayedStall.category] || DEFAULT_ZONE_STYLE).stroke,
                       opacity: 0.9,
                     }}
                   />
                   <span className="text-[0.6rem] font-bold text-slate-500 uppercase tracking-widest">
-                    {selectedStall.category}
+                    {displayedStall.category}
                   </span>
                 </div>
 
@@ -1786,14 +1828,14 @@ export default function MapViewer({ eventId: propEventId }) {
                 <div className="flex items-start gap-2">
                   <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-px" />
                   <div>
-                    <p className="text-sm font-bold text-slate-100 leading-snug">{selectedStall.name}</p>
-                    <p className="text-[0.62rem] text-slate-550 font-mono mt-0.5">{selectedStall.id}</p>
+                    <p className="text-sm font-bold text-slate-100 leading-snug">{displayedStall.name}</p>
+                    <p className="text-[0.62rem] text-slate-550 font-mono mt-0.5">{displayedStall.id}</p>
                   </div>
                 </div>
 
                 {/* EP-12: Simulation Live Crowd Density Telemetry Display */}
-                {isSimulationMode && zoneCrowdData[selectedStall.id] && (() => {
-                  const crowd = zoneCrowdData[selectedStall.id];
+                {isSimulationMode && zoneCrowdData[displayedStall.id] && (() => {
+                  const crowd = zoneCrowdData[displayedStall.id];
                   const ratio = crowd.count / crowd.capacity;
                   const isRed = ratio >= 0.8;
                   const isYellow = ratio >= 0.5 && ratio < 0.8;
@@ -1826,7 +1868,7 @@ export default function MapViewer({ eventId: propEventId }) {
                 {/* Category tag row */}
                 <div className="flex items-center gap-1.5">
                   <Tag className="w-3 h-3 text-indigo-400 shrink-0" />
-                  <span className="text-[0.65rem] text-slate-400">{selectedStall.category}</span>
+                  <span className="text-[0.65rem] text-slate-400">{displayedStall.category}</span>
                 </div>
 
                 {/* Application status / display workflows */}
@@ -1877,7 +1919,7 @@ export default function MapViewer({ eventId: propEventId }) {
                         Required Category (Set by Operator)
                       </span>
                       <span className="text-xs font-bold text-indigo-400">
-                        {selectedStall.category}
+                        {displayedStall.category}
                       </span>
                     </div>
 
@@ -1977,8 +2019,8 @@ export default function MapViewer({ eventId: propEventId }) {
           })()}
 
           {/* ── Fallback hint — shown when no zone is selected ────────────── */}
-          {!isEditorMode && !selectedStall && (
-            <div className="flex flex-col items-center justify-center gap-2 py-6 text-slate-600">
+          {!isEditorMode && !displayedStall && (
+            <div className="flex flex-col items-center justify-center gap-2 py-6 text-slate-600 animate-scale-in">
               <MapPin className="w-5 h-5 opacity-40" />
               <p className="text-[0.7rem] text-center leading-relaxed">
                 Click any coloured zone on the floor plan to view its details.
@@ -1986,7 +2028,7 @@ export default function MapViewer({ eventId: propEventId }) {
             </div>
           )}
 
-          <div className="flex items-center justify-between gap-2">
+          <div className="mt-auto pt-3 border-t border-white/[0.05] flex items-center justify-between gap-2">
             <h2 className="text-sm font-bold text-slate-50">Map Controls</h2>
             <span className="bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[0.62rem] font-bold px-2 py-0.5 rounded-full tracking-wider uppercase">
               View
@@ -2117,7 +2159,26 @@ export default function MapViewer({ eventId: propEventId }) {
         {/* EP-13: Congestion Adaptive Routing Toast Alert Banner (Smooth Hardware Accelerated Transitions) */}
         {isSimulationMode && activeAlert && (
           <div
-            className="pointer-events-auto flex items-start gap-3 p-4 rounded-xl shadow-2xl border bg-rose-950/95 border-rose-500/30 text-rose-100 text-xs leading-snug max-w-[22rem]"
+            onClick={() => {
+              if (activeAlert.recommendationCenter) {
+                panToStall(activeAlert.recommendationCenter);
+                setFlashMarker(activeAlert.recommendationCenter);
+                setSelectedStall({
+                  id: activeAlert.recommendationId,
+                  name: activeAlert.recommendationName,
+                  category: "Alternative Route Suggestion"
+                });
+                setActiveNavigation({
+                  id: activeAlert.recommendationId,
+                  name: activeAlert.recommendationName,
+                  center: activeAlert.recommendationCenter
+                });
+                addToast("Live Navigation Path active! Follow the dotted line.", "info");
+                addToast("Panning to alternative route...", "success");
+                setActiveAlert(null); // Dismiss notification after tapping
+              }
+            }}
+            className="pointer-events-auto flex items-start gap-3 p-4 rounded-xl shadow-2xl border bg-rose-950/95 hover:bg-rose-900/95 border-rose-500/30 text-rose-100 text-xs leading-snug max-w-[22rem] cursor-pointer transition-all duration-200"
             style={{
               animation: "toastSlideIn 0.38s cubic-bezier(0.16, 1, 0.3, 1) both",
               willChange: "transform, opacity",
@@ -2125,43 +2186,18 @@ export default function MapViewer({ eventId: propEventId }) {
               backfaceVisibility: "hidden"
             }}
           >
-            <span className="text-sm shrink-0 mt-0.5">??</span>
+            <span className="text-sm shrink-0 mt-0.5">🚨</span>
             <div className="flex-1 space-y-2">
               <div>
                 <h4 className="font-extrabold text-rose-200 uppercase tracking-wider text-[0.62rem]">Congestion Warning</h4>
                 <p className="text-[0.68rem] text-rose-300 font-medium leading-normal mt-0.5">
-                  Zone <strong>{activeAlert.zoneName}</strong> is overcrowded. 
-                  We suggest routing to nearby clear zone <strong>{activeAlert.recommendationName}</strong>.
+                  <strong>{activeAlert.zoneName}</strong> is currently at maximum capacity. We suggest visiting <strong>{activeAlert.recommendationName}</strong> instead!
                 </p>
               </div>
               <div className="flex gap-2 justify-end">
-                <button
-                  onClick={() => {
-                    if (activeAlert.recommendationCenter) {
-                      panToStall(activeAlert.recommendationCenter);
-                      setSelectedStall({
-                        id: activeAlert.recommendationId,
-                        name: activeAlert.recommendationName,
-                        category: "Alternative Route Suggestion"
-                      });
-                      setActiveNavigation({
-                        id: activeAlert.recommendationId,
-                        name: activeAlert.recommendationName,
-                        center: activeAlert.recommendationCenter
-                      });
-                      addToast("Live Navigation Path active! Follow the dotted line.", "info");
-                      setSelectedStall({
-                        id: activeAlert.recommendationId,
-                        name: activeAlert.recommendationName,
-                        category: "Alternative Route Suggestion"
-                      });
-                      addToast("Panning to alternative route...", "success");
-                    }
-                  }}
-                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[0.6rem] rounded-lg transition-colors cursor-pointer shadow-sm"
-                >
-                  Reroute / Pan to Zone
-                </button>
+                <span className="text-[0.6rem] font-bold text-emerald-400 animate-pulse">
+                  Tap to view alternative →
+                </span>
               </div>
             </div>
           </div>

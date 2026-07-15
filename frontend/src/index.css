@@ -138,12 +138,21 @@
 .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
 
 @keyframes scaleIn {
-  from { transform: scale(0.95); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
+  from { transform: translateY(10px) scale(0.97); opacity: 0; }
+  to   { transform: translateY(0)     scale(1);    opacity: 1; }
 }
 
 .animate-scale-in {
-  animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: scaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes scaleOut {
+  from { transform: translateY(0)     scale(1);    opacity: 1; }
+  to   { transform: translateY(8px)   scale(0.97); opacity: 0; }
+}
+
+.animate-scale-out {
+  animation: scaleOut 0.18s cubic-bezier(0.4, 0, 1, 1) forwards;
 }
 
 /* ─── Toast slide-in (GPU-composited — no layout, no paint) ───────────── */
