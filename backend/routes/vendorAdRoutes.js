@@ -2,9 +2,10 @@ import express from 'express';
 import {
   createVendorAd,
   getVendorAds,
+  getActiveAdsForEvent,
   updateVendorAd,
   deleteVendorAd,
-  getNearbyAds,
+  triggerAdForUser,
 } from '../controllers/vendorAdController.js';
 
 const router = express.Router();
@@ -15,7 +16,10 @@ router.get('/vendor/:vendorId', getVendorAds);
 router.put('/:id', updateVendorAd);
 router.delete('/:id', deleteVendorAd);
 
-// EP-129 + EP-134: Attendee geofence trigger, with anti-spam cooldown
-router.post('/nearby', getNearbyAds);
+// EP-129: All active ads for an event (loaded once by MapViewer)
+router.get('/event/:eventId/active', getActiveAdsForEvent);
+
+// EP-134: Cooldown-checked trigger — called when "me" enters an ad's radius
+router.post('/trigger', triggerAdForUser);
 
 export default router;

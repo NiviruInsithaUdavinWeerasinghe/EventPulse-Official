@@ -1,45 +1,26 @@
 import VendorAd from '../models/VendorAd.js';
 import AdImpression from '../models/AdImpression.js';
 
-// ── EP-134: Anti-spam cooldown — same ad won't re-trigger for a user within this window
+// EP-134: Anti-spam cooldown — same ad won't re-trigger for a user within this window
 const COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes
 
-/**
- * Haversine formula — great-circle distance between two GPS points, in meters.
- */
-function haversineDistanceMeters(lat1, lon1, lat2, lon2) {
-  const R = 6371000; // Earth radius in meters
-  const toRad = (deg) => (deg * Math.PI) / 180;
-
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-  return R * c;
-}
-
-// ── EP-126: Vendor creates a location-based ad ──────────────────────────────
+// ── EP-126: Vendor creates a proximity ad anchored to their approved stall ──
 // POST /api/vendor-ads
 export const createVendorAd = async (req, res) => {
   try {
-    const { eventId, vendorId, stallId, title, message, latitude, longitude, radiusMeters } = req.body;
+    const { eventId, vendorId, stallId, title, message, radiusPx } = req.body;
 
-    if (!eventId || !vendorId || !title || !message || latitude === undefined || longitude === undefined) {
+    if (!eventId || !vendorId || !stallId || !title || !message) {
       return res.status(400).json({ success: false, message: 'Missing required ad fields.' });
     }
 
     const ad = await VendorAd.create({
       eventId,
       vendorId,
-      stallId: stallId || '',
+      stallId,
       title,
       message,
-      latitude,
-      longitude,
-      radiusMeters: radiusMeters || 50,
+      radiusPx: radiusPx || 80,
     });
 
     res.status(201).json({ success: true, data: ad });
@@ -60,6 +41,17 @@ export const getVendorAds = async (req, res) => {
   }
 };
 
+// ── EP-129: Get all active ads for an event (loaded once by MapViewer) ──────
+// GET /api/vendor-ads/event/:eventId/active
+export const getActiveAdsForEvent = async (req, res) => {
+  try {
+    const ads = await VendorAd.find({ eventId: req.params.eventId, isActive: true });
+    res.status(200).json({ success: true, count: ads.length, data: ads });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // ── EP-126: Toggle an ad active/inactive, or update it ──────────────────────
 // PUT /api/vendor-ads/:id
 export const updateVendorAd = async (req, res) => {
@@ -67,12 +59,10 @@ export const updateVendorAd = async (req, res) => {
     const ad = await VendorAd.findById(req.params.id);
     if (!ad) return res.status(404).json({ success: false, message: 'Ad not found.' });
 
-    const { title, message, latitude, longitude, radiusMeters, isActive } = req.body;
+    const { title, message, radiusPx, isActive } = req.body;
     if (title !== undefined) ad.title = title;
     if (message !== undefined) ad.message = message;
-    if (latitude !== undefined) ad.latitude = latitude;
-    if (longitude !== undefined) ad.longitude = longitude;
-    if (radiusMeters !== undefined) ad.radiusMeters = radiusMeters;
+    if (radiusPx !== undefined) ad.radiusPx = radiusPx;
     if (isActive !== undefined) ad.isActive = isActive;
 
     await ad.save();
@@ -93,63 +83,39 @@ export const deleteVendorAd = async (req, res) => {
   }
 };
 
-// ── EP-129 + EP-134: Attendee-side geofence check ───────────────────────────
-// Given the attendee's current GPS position, find active ads whose
-// geofence radius contains that position — and filter out any ad still
-// in its anti-spam cooldown window for this user.
+// ── EP-134: Attempt to trigger an ad for a user (checks + applies cooldown) ─
+// Called by MapViewer the instant it detects the "me" marker is within an
+// ad's radius of its stall. Returns whether the ad is allowed to display.
 //
-// POST /api/vendor-ads/nearby
-// body: { userId, eventId, latitude, longitude }
-export const getNearbyAds = async (req, res) => {
+// POST /api/vendor-ads/trigger
+// body: { adId, userId }
+export const triggerAdForUser = async (req, res) => {
   try {
-    const { userId, eventId, latitude, longitude } = req.body;
+    const { adId, userId } = req.body;
 
-    if (!userId || !eventId || latitude === undefined || longitude === undefined) {
-      return res.status(400).json({ success: false, message: 'userId, eventId, latitude, and longitude are required.' });
+    if (!adId || !userId) {
+      return res.status(400).json({ success: false, message: 'adId and userId are required.' });
     }
 
-    // EP-129: pull all active ads for this event, then filter by geofence distance
-    const candidateAds = await VendorAd.find({ eventId, isActive: true });
-
-    const inRangeAds = candidateAds.filter((ad) => {
-      const distance = haversineDistanceMeters(latitude, longitude, ad.latitude, ad.longitude);
-      return distance <= ad.radiusMeters;
-    });
-
-    if (inRangeAds.length === 0) {
-      return res.status(200).json({ success: true, data: [] });
-    }
-
-    // EP-134: filter out ads still on cooldown for this specific user
     const now = Date.now();
-    const eligibleAds = [];
+    const impression = await AdImpression.findOne({ adId, userId });
 
-    for (const ad of inRangeAds) {
-      const impression = await AdImpression.findOne({ adId: ad._id, userId });
+    const isOnCooldown =
+      impression && now - new Date(impression.shownAt).getTime() < COOLDOWN_MS;
 
-      const isOnCooldown =
-        impression && now - new Date(impression.shownAt).getTime() < COOLDOWN_MS;
-
-      if (!isOnCooldown) {
-        eligibleAds.push(ad);
-      }
+    if (isOnCooldown) {
+      return res.status(200).json({ success: true, shouldShow: false, reason: 'cooldown' });
     }
 
-    // Record/refresh an impression timestamp for every ad we're about to show,
-    // so it goes on cooldown immediately (prevents duplicate rapid triggers).
-    await Promise.all(
-      eligibleAds.map((ad) =>
-        AdImpression.findOneAndUpdate(
-          { adId: ad._id, userId },
-          { shownAt: new Date() },
-          { upsert: true }
-        )
-      )
+    await AdImpression.findOneAndUpdate(
+      { adId, userId },
+      { shownAt: new Date() },
+      { upsert: true }
     );
 
-    res.status(200).json({ success: true, count: eligibleAds.length, data: eligibleAds });
+    res.status(200).json({ success: true, shouldShow: true });
   } catch (error) {
-    console.error('Get nearby ads error:', error);
+    console.error('Trigger ad error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

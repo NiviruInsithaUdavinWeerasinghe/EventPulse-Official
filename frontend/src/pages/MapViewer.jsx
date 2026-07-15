@@ -122,6 +122,11 @@ export default function MapViewer({ eventId: propEventId }) {
   const [flashMarker, setFlashMarker] = useState(null); // { x, y } in SVG coords
   const panAnimRef = useRef(null);
 
+  // ── EP-129/134: Proximity vendor ads ──────────────────────────────────
+  const [vendorAds, setVendorAds] = useState([]);
+  const [activeAdNotification, setActiveAdNotification] = useState(null); // { title, message }
+  const adCooldownRef = useRef({});
+
   // Sync selectedStall → displayedStall with exit-animation delay
   useEffect(() => {
     if (selectedStall) {
@@ -206,6 +211,20 @@ export default function MapViewer({ eventId: propEventId }) {
       fetchApplications();
     }
   }, [eventId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fetchVendorAds = async () => {
+    try {
+      const res = await fetch(`/api/vendor-ads/event/${eventId}/active`);
+      const data = await res.json();
+      if (data.success) setVendorAds(data.data);
+    } catch (err) {
+      console.error('Error fetching vendor ads:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (eventId) fetchVendorAds();
+  }, [eventId]);
 
   // --- Crowd Telemetry Simulation Loop (EP-12) ---------------------------
   useEffect(() => {
@@ -360,6 +379,42 @@ export default function MapViewer({ eventId: propEventId }) {
       setSelectedStall(null);
     }
   }, [isSimulationMode, userPosition, event]);
+
+  // ── EP-129/134: Vendor ad proximity trigger ─────────────────────────────
+  useEffect(() => {
+    if (!isSimulationMode || !userPosition || vendorAds.length === 0 || !event?.zones) return;
+
+    for (const ad of vendorAds) {
+      const zone = event.zones.find(z => z.id === ad.stallId);
+      if (!zone?.center) continue;
+
+      const dx = userPosition.x - zone.center.x;
+      const dy = userPosition.y - zone.center.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist <= ad.radiusPx) {
+        const lastLocalTrigger = adCooldownRef.current[ad._id] || 0;
+        if (Date.now() - lastLocalTrigger < 5000) continue;
+        adCooldownRef.current[ad._id] = Date.now();
+
+        fetch('/api/vendor-ads/trigger', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ adId: ad._id, userId: loggedInUser.id }),
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (data.success && data.shouldShow) {
+              setActiveAdNotification({ title: ad.title, message: ad.message });
+              setTimeout(() => setActiveAdNotification(null), 6000);
+            }
+          })
+          .catch(err => console.error('Ad trigger error:', err));
+
+        break;
+      }
+    }
+  }, [isSimulationMode, userPosition, vendorAds, event]);
 
   // --- Proximity & Adaptive Routing Detector (EP-13) ----------------------
   useEffect(() => {
@@ -2152,6 +2207,25 @@ export default function MapViewer({ eventId: propEventId }) {
           </div>
         </div>,
         document.body
+      )}
+
+      {/* EP-129/134: Proximity ad notification */}
+      {activeAdNotification && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[150] animate-fade-in">
+          <div className="flex items-start gap-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-5 py-3.5 rounded-2xl shadow-2xl border border-white/20 max-w-sm">
+            <span className="text-lg shrink-0">📍</span>
+            <div>
+              <p className="text-sm font-bold leading-tight">{activeAdNotification.title}</p>
+              <p className="text-xs text-white/85 mt-0.5">{activeAdNotification.message}</p>
+            </div>
+            <button
+              onClick={() => setActiveAdNotification(null)}
+              className="ml-1 text-white/70 hover:text-white shrink-0"
+            >
+              ×
+            </button>
+          </div>
+        </div>
       )}
 
       {/* GPU-accelerated toast notifications */}
