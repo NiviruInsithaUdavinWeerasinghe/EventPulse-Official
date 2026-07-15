@@ -41,6 +41,14 @@ export default function VendorPortal() {
       route: '/vendor/analytics',
       color: 'amber',
     },
+    {
+      icon: '📢',
+      title: 'Proximity Ad Campaigns',
+      desc: 'Create real-time geofenced advertisement campaigns to target attendees near your stall location.',
+      label: 'Manage Ads',
+      route: '/vendor/ads',
+      color: 'indigo',
+    },
   ];
 
   const iconStyles = {
