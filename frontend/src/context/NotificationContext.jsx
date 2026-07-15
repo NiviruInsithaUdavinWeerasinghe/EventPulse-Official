@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { CheckCircle, AlertTriangle, X, Wallet } from 'lucide-react';
+import { CheckCircle, AlertTriangle, X, Wallet, MapPin, Database } from 'lucide-react';
 
 const NotificationContext = createContext();
 
@@ -71,7 +71,7 @@ export function NotificationProvider({ children }) {
         try {
           const data = JSON.parse(event.data);
           
-          if (data.type === 'TX_SUCCESS' || data.type === 'TX_REJECTED') {
+          if (data.type === 'TX_SUCCESS' || data.type === 'TX_REJECTED' || data.type === 'AREA_FULL_ALERT') {
             // Cancel previous timeout
             if (alertTimeoutRef.current) {
               clearTimeout(alertTimeoutRef.current);
@@ -80,6 +80,7 @@ export function NotificationProvider({ children }) {
             // Set active alert details
             setActiveAlert({
               type: data.type,
+              title: data.title || 'Notification',
               message: data.message,
               amount: data.amount,
               vendorName: data.vendorName || 'Stall Vendor',
@@ -147,7 +148,20 @@ export function NotificationProvider({ children }) {
               <X size={18} />
             </button>
 
-            {activeAlert.type === 'TX_REJECTED' ? (
+            {activeAlert.type === 'AREA_FULL_ALERT' ? (
+              <>
+                <div className="w-16 h-16 bg-rose-500/10 border border-rose-500/20 rounded-full flex items-center justify-center mx-auto mb-4 text-rose-500 animate-pulse">
+                  <AlertTriangle className="w-10 h-10" />
+                </div>
+                <h2 className="text-xl font-extrabold text-rose-600 dark:text-rose-400 mb-2">{activeAlert.title}</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-4 leading-relaxed">
+                  {activeAlert.message}
+                </p>
+                <div className="bg-rose-500/5 border border-rose-500/10 rounded-xl p-3 text-center text-xs mb-2 text-rose-600 dark:text-rose-400 font-semibold">
+                  We suggest avoiding this area to prevent congestion.
+                </div>
+              </>
+            ) : activeAlert.type === 'TX_REJECTED' ? (
               <>
                 <div className="w-16 h-16 bg-rose-500/10 border border-rose-500/20 rounded-full flex items-center justify-center mx-auto mb-4 text-rose-500 animate-bounce">
                   <AlertTriangle className="w-10 h-10" />
@@ -185,17 +199,354 @@ export function NotificationProvider({ children }) {
 
             <button
               onClick={() => setActiveAlert(null)}
-              className="w-full mt-4 py-2.5 bg-slate-150 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-800 dark:text-slate-250 font-bold rounded-xl text-xs transition-colors cursor-pointer border-none"
+              className="w-full mt-4 py-2.5 bg-white hover:bg-slate-100 dark:bg-white dark:hover:bg-slate-100 text-black dark:text-black font-extrabold rounded-xl text-xs border border-slate-200 dark:border-none transition-colors cursor-pointer"
             >
               Dismiss
             </button>
           </div>
         </div>
       )}
+
+      {/* ── Global Proximity Simulator Widget ── */}
+      <FloatingProximitySimulator />
     </NotificationContext.Provider>
   );
 }
 
 export function useNotification() {
   return useContext(NotificationContext);
+}
+
+/* ─── Floating Proximity Alert Simulation Panel ─── */
+function FloatingProximitySimulator() {
+  const { activeAlert } = useNotification();
+  const [isOpen, setIsOpen] = useState(false);
+  const [zones, setZones] = useState([]);
+  const [latitude, setLatitude] = useState('6.92725');
+  const [longitude, setLongitude] = useState('79.86125');
+  const [fcmToken, setFcmToken] = useState('mock_fcm_token_client_12345');
+  const [isAutoPing, setIsAutoPing] = useState(false);
+  const [logs, setLogs] = useState([]);
+  const intervalRef = useRef(null);
+
+  const addLog = (msg) => {
+    const time = new Date().toLocaleTimeString();
+    setLogs((prev) => [`[${time}] ${msg}`, ...prev].slice(0, 15));
+  };
+
+  const fetchZones = async () => {
+    try {
+      const res = await fetch('/api/location/zones');
+      const data = await res.json();
+      if (data.success) {
+        setZones(data.data);
+      }
+    } catch (err) {
+      addLog(`Failed to fetch zones: ${err.message}`);
+    }
+  };
+
+  const seedZones = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/location/seed-zones', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (data.success) {
+        addLog('Demo zones seeded successfully!');
+        fetchZones();
+      }
+    } catch (err) {
+      addLog(`Seeding zones failed: ${err.message}`);
+    }
+  };
+
+  const toggleZoneStatus = async (zoneId, currentStatus) => {
+    try {
+      const token = localStorage.getItem('token');
+      const newStatus = currentStatus === 'Red' ? 'Green' : 'Red';
+      const res = await fetch(`/api/location/zones/${zoneId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+      const data = await res.json();
+      if (data.success) {
+        addLog(`Updated ${data.data.name} status to ${newStatus}`);
+        fetchZones();
+      }
+    } catch (err) {
+      addLog(`Failed to update status: ${err.message}`);
+    }
+  };
+
+  const sendPing = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/location/ping', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          latitude: parseFloat(latitude),
+          longitude: parseFloat(longitude),
+          fcmToken
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        addLog(`Ping sent: Lat ${latitude}, Lng ${longitude}`);
+      } else {
+        addLog(`Ping error response: ${data.message}`);
+      }
+    } catch (err) {
+      addLog(`Ping request failed: ${err.message}`);
+    }
+  };
+
+  useEffect(() => {
+    fetchZones();
+  }, []);
+
+  useEffect(() => {
+    if (activeAlert && activeAlert.type === 'AREA_FULL_ALERT') {
+      addLog(`🚨 Alert: ${activeAlert.title} - ${activeAlert.message}`);
+    }
+  }, [activeAlert]);
+
+  useEffect(() => {
+    if (isAutoPing) {
+      addLog('Auto-Ping started (every 30 seconds)');
+      sendPing(); // Run immediately
+      intervalRef.current = setInterval(sendPing, 30000);
+    } else {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        addLog('Auto-Ping stopped');
+      }
+    }
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [isAutoPing, latitude, longitude, fcmToken]);
+
+  // Don't render simulator if user is not logged in (no token)
+  const token = localStorage.getItem('token');
+  if (!token) return null;
+
+  return (
+    <div className="fixed bottom-4 right-4 z-[9998] font-sans">
+      {/* Floating Toggle Button */}
+      {!isOpen && (
+        <button
+          onClick={() => {
+            setIsOpen(true);
+            fetchZones();
+          }}
+          className="flex items-center gap-2 px-4 py-3 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold text-xs shadow-2xl hover:scale-105 transition-transform cursor-pointer border-none"
+        >
+          <MapPin size={14} />
+          <span>🛠️ Proximity Simulator</span>
+        </button>
+      )}
+
+      {/* Expanded Panel */}
+      {isOpen && (
+        <div className="w-[380px] max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md shadow-2xl p-5 space-y-4 text-slate-900 dark:text-white transition-all duration-200">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 pb-2.5">
+            <div className="flex items-center gap-1.5">
+              <MapPin className="text-indigo-500" size={16} />
+              <div>
+                <h4 className="text-xs font-extrabold tracking-wide uppercase">Proximity Simulator</h4>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400">Test Capacity Alerts & GPS Ping</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={seedZones}
+                className="text-[10px] font-bold py-1 px-2.5 rounded bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 cursor-pointer"
+              >
+                Seed Zones
+              </button>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="text-slate-400 hover:text-slate-650 dark:hover:text-white transition-colors cursor-pointer bg-transparent border-none"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* Zones Section */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-slate-450 uppercase tracking-wider">Halls / Zones ({zones.length})</span>
+              <button onClick={fetchZones} className="text-[9px] text-indigo-500 font-bold bg-transparent border-none cursor-pointer">
+                Refresh
+              </button>
+            </div>
+
+            <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-0.5">
+              {zones.length === 0 ? (
+                <p className="text-[10px] text-slate-500 italic">No zones. Click Seed Zones to populate.</p>
+              ) : (
+                zones.map((zone) => {
+                  const isRed = zone.status === 'Red';
+                  return (
+                    <div key={zone._id} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-zinc-900/50 border border-slate-200/50 dark:border-zinc-800/60">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-extrabold truncate">{zone.name}</p>
+                        <span className={`text-[8px] px-1.5 py-0.5 rounded font-extrabold uppercase inline-block mt-0.5 ${
+                          isRed ? 'bg-rose-500/10 text-rose-500' : 'bg-emerald-500/10 text-emerald-500'
+                        }`}>
+                          {isRed ? 'RED (FULL)' : 'GREEN (NORMAL)'}
+                        </span>
+                      </div>
+                      
+                      {/* HIGHLY VISIBLE TOGGLE BUTTON */}
+                      <button
+                        onClick={() => toggleZoneStatus(zone._id, zone.status)}
+                        className={`text-[9px] font-extrabold py-1 px-3 rounded-lg shadow-sm border transition-all cursor-pointer ${
+                          isRed
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-500'
+                            : 'bg-rose-600 hover:bg-rose-700 text-white border-rose-500'
+                        }`}
+                      >
+                        {isRed ? '🟩 Mark Normal' : '🟥 Mark Full'}
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Teleport Presets */}
+          <div className="space-y-1.5">
+            <span className="text-[10px] font-bold text-slate-450 uppercase tracking-wider block">Teleport Presets</span>
+            <div className="grid grid-cols-3 gap-1.5">
+              <button
+                onClick={() => {
+                  setLatitude('6.92725');
+                  setLongitude('79.86125');
+                  addLog('Teleport to Hall A');
+                }}
+                className="py-1.5 text-[9px] font-extrabold rounded-lg border bg-slate-50 dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-zinc-850 cursor-pointer"
+              >
+                📍 Hall A (Full)
+              </button>
+              <button
+                onClick={() => {
+                  setLatitude('6.92825');
+                  setLongitude('79.86225');
+                  addLog('Teleport to Hall B');
+                }}
+                className="py-1.5 text-[9px] font-extrabold rounded-lg border bg-slate-50 dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-zinc-850 cursor-pointer"
+              >
+                📍 Hall B (Green)
+              </button>
+              <button
+                onClick={() => {
+                  setLatitude('6.92900');
+                  setLongitude('79.86400');
+                  addLog('Teleport Far Away');
+                }}
+                className="py-1.5 text-[9px] font-extrabold rounded-lg border bg-slate-50 dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-zinc-850 cursor-pointer"
+              >
+                📍 Far Away
+              </button>
+            </div>
+          </div>
+
+          {/* Lat/Lng Input */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[9px] text-slate-450 font-bold block mb-0.5 uppercase">Latitude</label>
+              <input
+                type="text"
+                value={latitude}
+                onChange={(e) => setLatitude(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg py-1 px-2.5 text-[10px] text-slate-900 dark:text-white focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-[9px] text-slate-450 font-bold block mb-0.5 uppercase">Longitude</label>
+              <input
+                type="text"
+                value={longitude}
+                onChange={(e) => setLongitude(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg py-1 px-2.5 text-[10px] text-slate-900 dark:text-white focus:outline-none"
+              />
+            </div>
+          </div>
+
+          {/* FCM Input */}
+          <div>
+            <label className="text-[9px] text-slate-450 font-bold block mb-0.5 uppercase">FCM token</label>
+            <input
+              type="text"
+              value={fcmToken}
+              onChange={(e) => setFcmToken(e.target.value)}
+              className="w-full bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg py-1 px-2.5 text-[10px] text-slate-900 dark:text-white focus:outline-none"
+            />
+          </div>
+
+          {/* Action buttons */}
+          <div className="grid grid-cols-2 gap-2 pt-1 font-semibold">
+            <button
+              onClick={sendPing}
+              className="py-2.5 rounded-xl font-extrabold text-[10px] bg-gradient-to-r from-indigo-500 to-purple-650 hover:from-indigo-600 hover:to-purple-700 text-white cursor-pointer border-none shadow-md"
+            >
+              Send GPS Ping
+            </button>
+            <button
+              onClick={() => setIsAutoPing(!isAutoPing)}
+              className={`py-2.5 rounded-xl font-extrabold text-[10px] border transition-all cursor-pointer ${
+                isAutoPing
+                  ? 'bg-rose-500/20 border-rose-500 text-rose-500'
+                  : 'bg-slate-50 dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-slate-350 hover:bg-slate-100 dark:hover:bg-zinc-850'
+              }`}
+            >
+              {isAutoPing ? '⏹ Stop Auto (30s)' : '▶ Auto Ping (30s)'}
+            </button>
+          </div>
+
+          {/* Logs */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Console logs</span>
+              <button
+                onClick={() => setLogs([])}
+                className="text-[10px] text-indigo-400 font-extrabold uppercase bg-transparent border-none cursor-pointer tracking-wider"
+              >
+                Clear
+              </button>
+            </div>
+            <div className="h-36 rounded-xl bg-slate-950/95 border border-slate-800 p-3 font-mono text-[11px] text-indigo-305 overflow-y-auto space-y-1 leading-normal font-semibold">
+              {logs.length === 0 ? (
+                <p className="text-slate-500 italic text-[10px]">No logs recorded. Ping to start.</p>
+              ) : (
+                logs.map((log, idx) => (
+                  <div key={idx} className={log.includes('Alert') ? 'text-rose-400 font-extrabold' : ''}>
+                    {log}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

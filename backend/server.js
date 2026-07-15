@@ -16,8 +16,14 @@ import settlementRoutes from './routes/settlementRoutes.js';
 import reconciliationRoutes from './routes/reconciliationRoutes.js';
 import exportRoutes from './routes/exportRoutes.js';
 import vendorAdRoutes from './routes/vendorAdRoutes.js';
+import locationRoutes from './routes/locationRoutes.js';
+import { startLocationBatchProcessor } from './services/locationBatchService.js';
+
 // Connect to MongoDB
 connectDB();
+
+// Initialize batch location updater
+startLocationBatchProcessor();
 
 const app = express();
 const server = http.createServer(app);
@@ -56,3 +62,4 @@ server.listen(PORT, () => {
 });
 
 app.use('/api/vendor-ads', vendorAdRoutes);
+app.use('/api/location', locationRoutes);

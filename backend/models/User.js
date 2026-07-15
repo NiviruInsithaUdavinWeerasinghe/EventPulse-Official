@@ -10,6 +10,10 @@ const userSchema = new mongoose.Schema({
   googleId:      { type: String },
   avatar:        { type: String },
   walletBalance: { type: Number, default: 24750 },
+  fcmToken:      { type: String },
+  latitude:      { type: Number },
+  longitude:     { type: Number },
+  lastPing:      { type: Date },
 }, { timestamps: true });
 
 userSchema.pre('save', async function (next) {

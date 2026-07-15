@@ -17,6 +17,7 @@ import {
   X,
   AlertTriangle,
   CheckCircle,
+  Database,
 } from 'lucide-react';
 
 
@@ -772,4 +773,3 @@ export default function CustomerDashboard() {
     </div>
   );
 }
-
