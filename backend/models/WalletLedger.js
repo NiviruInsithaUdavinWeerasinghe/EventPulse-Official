@@ -61,7 +61,7 @@ const walletLedgerSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Reference type is required'],
     enum: {
-      values: ['TicketPurchase', 'TopUp', 'Refund', 'VendorPayment', 'ManualAdjustment', 'EntryActivation'],
+      values: ['TicketPurchase', 'TopUp', 'Refund', 'VendorPayment', 'ManualAdjustment', 'EntryActivation', 'FlashSalePurchase'],
       message: '{VALUE} is not a valid reference type'
     }
   },

@@ -91,3 +91,30 @@ export const sendNotification = (userId, payload) => {
     });
   }
 };
+
+// Sends to every connected client across every user — used for event-wide
+// broadcasts (e.g. flash sales) rather than a single targeted notification.
+export const broadcastToAll = (payload) => {
+  const messageStr = JSON.stringify(payload);
+  clientSockets.forEach((sockets) => {
+    sockets.forEach((ws) => {
+      if (ws.readyState === 1) { // OPEN
+        ws.send(messageStr);
+      }
+    });
+  });
+};
+
+// 'flash_sale_broadcast' channel: every attendee client already holds one
+// open WebSocket connection (see NotificationContext.jsx) multiplexed by
+// `type`, so this "channel" is just a dedicated message type broadcast to
+// all of them rather than a separate socket/subscription.
+export const broadcastFlashSale = ({ vendorName, promoText, expiresAt }) => {
+  broadcastToAll({
+    channel: 'flash_sale_broadcast',
+    type: 'flash_sale_broadcast',
+    vendorName,
+    promoText,
+    expiresAt, // absolute server timestamp (ISO string) — NOW + 15 minutes
+  });
+};
