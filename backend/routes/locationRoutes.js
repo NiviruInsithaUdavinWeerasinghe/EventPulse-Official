@@ -4,6 +4,9 @@ import VenueZone from '../models/VenueZone.js';
 import { queueLocationPing } from '../services/locationBatchService.js';
 import { sendFcmNotification } from '../services/fcmService.js';
 import { sendNotification as sendWsNotification } from '../socketManager.js';
+import Ticket from '../models/Ticket.js';
+import Event from '../models/Event.js';
+import LocationPing from '../models/LocationPing.js';
 
 const router = express.Router();
 
@@ -31,6 +34,39 @@ router.post('/ping', protect, async (req, res) => {
     // 2. Perform spatial query asynchronously in the background (SUB-2 & SUB-3)
     // Run this process after responding or do not await it, keeping the endpoint lightweight.
     runSpatialCheck(userId, parseFloat(latitude), parseFloat(longitude), fcmToken);
+
+    // 3. Record historical LocationPing for peak hours analytics (US-601)
+    try {
+      let eventIdToUse = null;
+
+      // If a specific eventId was passed from the Proximity Simulator, use it directly
+      if (req.body.eventId) {
+        eventIdToUse = req.body.eventId;
+      } else {
+        // Otherwise resolve from user's latest ticket, or fall back to the most recent event
+        const latestTicket = await Ticket.findOne({ user: userId }).sort({ createdAt: -1 });
+        if (latestTicket) {
+          eventIdToUse = latestTicket.event;
+        } else {
+          const defaultEvent = await Event.findOne().sort({ createdAt: -1 });
+          if (defaultEvent) {
+            eventIdToUse = defaultEvent._id;
+          }
+        }
+      }
+
+      if (eventIdToUse) {
+        await LocationPing.create({
+          eventId: eventIdToUse,
+          userId: userId,
+          latitude: parseFloat(latitude),
+          longitude: parseFloat(longitude),
+          timestamp: new Date()
+        });
+      }
+    } catch (dbErr) {
+      console.error('[Location Historical Ping Save Error]:', dbErr);
+    }
 
     // Respond immediately to prevent server lag or blocking the client request (optimized)
     return res.status(200).json({ success: true, message: 'Ping received and queued.' });

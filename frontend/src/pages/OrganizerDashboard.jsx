@@ -17,6 +17,7 @@ import {
   CheckCircle,
   AlertCircle,
   FileText,
+  BarChart3,
   User
 } from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle.jsx';
@@ -31,6 +32,7 @@ import SettingsView from '../components/organizer/SettingsView.jsx';
 import SupportView from '../components/organizer/SupportView.jsx';
 import CreateEvent from './CreateEvent.jsx';
 import ScheduleManager from '../components/organizer/ScheduleManager.jsx';
+import AnalyticsView from '../components/organizer/AnalyticsView.jsx';
 
 export default function OrganizerDashboard() {
   const navigate = useNavigate();
@@ -127,6 +129,7 @@ export default function OrganizerDashboard() {
 
   const mainNavs = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'analytics', label: 'Visitor Analytics', icon: BarChart3 },
     { id: 'events', label: 'Event Management', icon: Calendar },
     { id: 'schedule', label: 'Schedule Manager', icon: Calendar },
     { id: 'blueprints', label: 'Blueprint / Map Uploads', icon: Map },
@@ -258,6 +261,8 @@ export default function OrganizerDashboard() {
     switch(activeTab) {
       case 'dashboard':
         return <MainDashboard setActiveTab={setActiveTab} searchQuery={searchQuery} />;
+      case 'analytics':
+        return <AnalyticsView />;
       case 'events':
         return <EventManagement searchQuery={searchQuery} />;
       case 'schedule':

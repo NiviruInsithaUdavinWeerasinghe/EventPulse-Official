@@ -14,9 +14,11 @@ import {
   getEventSchedule,
   createSubEvent,
   updateSubEvent,
-  deleteSubEvent
+  deleteSubEvent,
+  getPeakHours
 } from '../controllers/eventController.js';
 import { searchEventZones } from '../controllers/searchController.js';
+import { protect, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -26,6 +28,7 @@ router.put('/:id/zones', updateEventZones);
 router.post('/applications/submit', submitVendorApplication);
 router.put('/applications/:id/status', updateApplicationStatus);
 router.get('/:id/search', searchEventZones);
+router.get('/:id/peak-hours', protect, requireRole('organizer'), getPeakHours);
 
 router.post('/', upload.fields([{ name: 'banner', maxCount: 1 }, { name: 'floorMap', maxCount: 1 }]), createEvent);
 router.get('/', getAllEvents);

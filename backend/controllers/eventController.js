@@ -3,6 +3,8 @@ import { Readable } from 'stream';
 import Event from '../models/Event.js';
 import SubEvent from '../models/SubEvent.js';
 import VendorApplication from '../models/VendorApplication.js';
+import LocationPing from '../models/LocationPing.js';
+import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -402,3 +404,69 @@ export const deleteSubEvent = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// ── GET /api/events/:id/peak-hours ───────────────────────────────────────────
+/**
+ * Query the entire 'location_pings' table for the current event.
+ * Group millions of raw pings into 24 distinct hourly buckets, counting unique user IDs.
+ */
+export const getPeakHours = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid Event ID.' });
+    }
+
+    // Query entire location_pings collection for this event
+    const pings = await LocationPing.aggregate([
+      { $match: { eventId: new mongoose.Types.ObjectId(id) } },
+      {
+        $project: {
+          userId: 1,
+          hour: { $hour: { date: "$timestamp", timezone: "Asia/Colombo" } }
+        }
+      },
+      {
+        $group: {
+          _id: { hour: "$hour" },
+          uniqueUsers: { $addToSet: "$userId" }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          hour: "$_id.hour",
+          count: { $size: "$uniqueUsers" }
+        }
+      }
+    ]);
+
+    // Construct 24 hourly buckets
+    const hourlyData = Array.from({ length: 24 }, (_, i) => {
+      const hourVal = i;
+      const formatted24h = `${String(hourVal).padStart(2, '0')}:00`;
+      
+      const ampm = hourVal >= 12 ? 'PM' : 'AM';
+      let displayHour = hourVal % 12;
+      displayHour = displayHour === 0 ? 12 : displayHour;
+      const timeString = `${String(displayHour).padStart(2, '0')}:00 ${ampm}`;
+
+      const found = pings.find(p => p.hour === hourVal);
+      return {
+        hour: hourVal,
+        timeString,       // e.g., "08:00 AM"
+        formatted24h,     // e.g., "08:00"
+        count: found ? found.count : 0
+      };
+    });
+
+    hourlyData.sort((a, b) => a.hour - b.hour);
+
+    return res.status(200).json({ success: true, data: hourlyData });
+  } catch (error) {
+    console.error('getPeakHours error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
