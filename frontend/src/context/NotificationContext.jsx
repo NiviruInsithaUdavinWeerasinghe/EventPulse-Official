@@ -292,6 +292,8 @@ function FloatingProximitySimulator() {
   const { activeAlert } = useNotification();
   const [isOpen, setIsOpen] = useState(false);
   const [zones, setZones] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [selectedEventId, setSelectedEventId] = useState('');
   const [latitude, setLatitude] = useState('6.92725');
   const [longitude, setLongitude] = useState('79.86125');
   const [fcmToken, setFcmToken] = useState('mock_fcm_token_client_12345');
@@ -313,6 +315,19 @@ function FloatingProximitySimulator() {
       }
     } catch (err) {
       addLog(`Failed to fetch zones: ${err.message}`);
+    }
+  };
+
+  const fetchEvents = async () => {
+    try {
+      const res = await fetch('/api/events');
+      const data = await res.json();
+      if (data.success && data.data.length > 0) {
+        setEvents(data.data);
+        setSelectedEventId(prev => prev || data.data[0]._id);
+      }
+    } catch (err) {
+      addLog(`Failed to fetch events: ${err.message}`);
     }
   };
 
@@ -361,21 +376,24 @@ function FloatingProximitySimulator() {
   const sendPing = async () => {
     try {
       const token = localStorage.getItem('token');
+      const body = {
+        latitude: parseFloat(latitude),
+        longitude: parseFloat(longitude),
+        fcmToken
+      };
+      if (selectedEventId) body.eventId = selectedEventId;
       const res = await fetch('/api/location/ping', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          latitude: parseFloat(latitude),
-          longitude: parseFloat(longitude),
-          fcmToken
-        })
+        body: JSON.stringify(body)
       });
       const data = await res.json();
       if (data.success) {
-        addLog(`Ping sent: Lat ${latitude}, Lng ${longitude}`);
+        const eventName = events.find(e => e._id === selectedEventId)?.name || 'Unknown';
+        addLog(`Ping sent → Event: ${eventName} | Lat ${latitude}, Lng ${longitude}`);
       } else {
         addLog(`Ping error response: ${data.message}`);
       }
@@ -386,6 +404,7 @@ function FloatingProximitySimulator() {
 
   useEffect(() => {
     fetchZones();
+    fetchEvents();
   }, []);
 
   useEffect(() => {
@@ -422,6 +441,7 @@ function FloatingProximitySimulator() {
           onClick={() => {
             setIsOpen(true);
             fetchZones();
+            fetchEvents();
           }}
           className="flex items-center gap-2 px-4 py-3 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold text-xs shadow-2xl hover:scale-105 transition-transform cursor-pointer border-none"
         >
@@ -432,9 +452,9 @@ function FloatingProximitySimulator() {
 
       {/* Expanded Panel */}
       {isOpen && (
-        <div className="w-[380px] max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md shadow-2xl p-5 space-y-4 text-slate-900 dark:text-white transition-all duration-200">
-          {/* Header */}
-          <div className="flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 pb-2.5">
+        <div className="w-[380px] max-w-[calc(100vw-2rem)] max-h-[85vh] rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md shadow-2xl text-slate-900 dark:text-white transition-all duration-200 flex flex-col overflow-hidden">
+          {/* Header — sticky, not scrolled */}
+          <div className="flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 pb-2.5 px-5 pt-5 shrink-0">
             <div className="flex items-center gap-1.5">
               <MapPin className="text-indigo-500" size={16} />
               <div>
@@ -457,6 +477,8 @@ function FloatingProximitySimulator() {
               </button>
             </div>
           </div>
+          {/* Scrollable body */}
+          <div className="flex-1 overflow-y-auto p-5 space-y-4">
 
           {/* Zones Section */}
           <div className="space-y-2">
@@ -500,6 +522,24 @@ function FloatingProximitySimulator() {
                 })
               )}
             </div>
+          </div>
+
+          {/* Event Selector */}
+          <div>
+            <label className="text-[9px] text-slate-450 font-bold block mb-0.5 uppercase">📡 Ping to Event</label>
+            <select
+              value={selectedEventId}
+              onChange={(e) => setSelectedEventId(e.target.value)}
+              className="w-full bg-slate-50 dark:bg-zinc-900 border border-indigo-300 dark:border-indigo-700 rounded-lg py-1.5 px-2.5 text-[10px] text-slate-900 dark:text-white focus:outline-none font-bold cursor-pointer"
+            >
+              {events.length === 0 ? (
+                <option value="">No events found</option>
+              ) : (
+                events.map(evt => (
+                  <option key={evt._id} value={evt._id}>{evt.name}</option>
+                ))
+              )}
+            </select>
           </div>
 
           {/* Teleport Presets */}
@@ -614,6 +654,7 @@ function FloatingProximitySimulator() {
                 ))
               )}
             </div>
+          </div>
           </div>
         </div>
       )}
