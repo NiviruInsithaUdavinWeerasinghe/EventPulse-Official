@@ -18,6 +18,7 @@ import exportRoutes from './routes/exportRoutes.js';
 import vendorAdRoutes from './routes/vendorAdRoutes.js';
 import locationRoutes from './routes/locationRoutes.js';
 import bookmarkRoutes from './routes/bookmarkRoutes.js';
+import flashSaleRoutes from './routes/flashSaleRoutes.js';
 import { startLocationBatchProcessor } from './services/locationBatchService.js';
 
 // Connect to MongoDB
@@ -52,6 +53,7 @@ app.use('/api/settlements', settlementRoutes);
 app.use('/api/reconciliation', reconciliationRoutes);
 app.use('/api/exports', exportRoutes);
 app.use('/api/bookmarks', bookmarkRoutes);
+app.use('/api/flash-sales', flashSaleRoutes);
 
 // Wallet service routes (customer-only — JWT + role guard applied inside walletRoutes)
 app.use('/api/wallet', walletRoutes);

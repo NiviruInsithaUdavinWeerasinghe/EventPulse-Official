@@ -7,6 +7,7 @@ export function NotificationProvider({ children }) {
   const [activeAlert, setActiveAlert] = useState(null);
   const [walletBalance, setWalletBalance] = useState(0);
   const [currency, setCurrency] = useState('LKR');
+  const [flashSaleBanner, setFlashSaleBanner] = useState(null);
   const alertTimeoutRef = useRef(null);
   const wsRef = useRef(null);
 
@@ -96,6 +97,16 @@ export function NotificationProvider({ children }) {
             alertTimeoutRef.current = setTimeout(() => {
               setActiveAlert(null);
             }, 15000);
+          } else if (data.type === 'flash_sale_broadcast') {
+            // 'flash_sale_broadcast' channel — every attendee client shares
+            // this one WS connection, so this fires for all of them at once.
+            // Mounting the banner (and unmounting it at zero) is owned
+            // entirely by FlashSaleBannerBar's own countdown interval below.
+            setFlashSaleBanner({
+              vendorName: data.vendorName,
+              promoText: data.promoText,
+              expiresAt: data.expiresAt,
+            });
           }
         } catch (err) {
           console.error('WS message parse error in NotificationContext:', err);
@@ -130,8 +141,19 @@ export function NotificationProvider({ children }) {
   }, []);
 
   return (
-    <NotificationContext.Provider value={{ activeAlert, setActiveAlert, walletBalance, setWalletBalance, currency, updateBalance }}>
+    <NotificationContext.Provider value={{ activeAlert, setActiveAlert, walletBalance, setWalletBalance, currency, updateBalance, flashSaleBanner, setFlashSaleBanner }}>
       {children}
+
+      {/* ── Flash Sale Broadcast Banner (US-302-SUB-3) ──
+          Mounted only while a flash sale is active; the banner's own
+          countdown interval unmounts it (via onExpire) the instant the
+          difference between now and expiresAt hits zero. */}
+      {flashSaleBanner && (
+        <FlashSaleBannerBar
+          banner={flashSaleBanner}
+          onExpire={() => setFlashSaleBanner(null)}
+        />
+      )}
 
       {/* ── Transaction Overlay Modal (US-406 / EP-94) ── */}
       {activeAlert && (
@@ -215,6 +237,54 @@ export function NotificationProvider({ children }) {
 
 export function useNotification() {
   return useContext(NotificationContext);
+}
+
+/* ─── Flash Sale Countdown Banner (US-302-SUB-3) ───
+   Fixed, highly-visible banner mounted at the top of the screen the
+   instant a 'flash_sale_broadcast' socket payload arrives. A single
+   setInterval computes (expiresAt - now) every second to drive the mm:ss
+   clock; the moment that difference reaches zero, it calls onExpire()
+   so the parent removes this component from the tree entirely. */
+function FlashSaleBannerBar({ banner, onExpire }) {
+  const [remainingMs, setRemainingMs] = useState(() => new Date(banner.expiresAt).getTime() - Date.now());
+
+  useEffect(() => {
+    const tick = () => {
+      const diff = new Date(banner.expiresAt).getTime() - Date.now();
+      setRemainingMs(diff);
+      if (diff <= 0) {
+        clearInterval(interval);
+        onExpire();
+      }
+    };
+
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [banner.expiresAt, onExpire]);
+
+  const totalSeconds = Math.max(Math.floor(remainingMs / 1000), 0);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  return (
+    <div className="fixed top-0 inset-x-0 z-[9997] bg-gradient-to-r from-rose-600 via-pink-600 to-rose-600 text-white px-4 py-3 flex items-center justify-center gap-3 shadow-[0_2px_20px_rgba(225,29,72,0.5)] border-b-2 border-white/30 animate-fade-in">
+      <span className="font-extrabold text-[10px] uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full shrink-0 animate-pulse">
+        ⚡ Flash Sale
+      </span>
+      <span className="text-xs sm:text-sm font-semibold truncate max-w-[55vw]">
+        <strong>{banner.vendorName}</strong>: {banner.promoText}
+      </span>
+      <span className="text-sm font-mono font-extrabold bg-black/25 px-2.5 py-0.5 rounded shrink-0 tabular-nums">
+        {minutes}:{seconds.toString().padStart(2, '0')}
+      </span>
+      <button
+        onClick={onExpire}
+        className="text-white/80 hover:text-white bg-transparent border-none cursor-pointer shrink-0"
+      >
+        <X size={14} />
+      </button>
+    </div>
+  );
 }
 
 /* ─── Floating Proximity Alert Simulation Panel ─── */
