@@ -20,6 +20,7 @@ import locationRoutes from './routes/locationRoutes.js';
 import bookmarkRoutes from './routes/bookmarkRoutes.js';
 import flashSaleRoutes from './routes/flashSaleRoutes.js';
 import { startLocationBatchProcessor } from './services/locationBatchService.js';
+import voteRoutes from './routes/voteRoutes.js';
 
 // Connect to MongoDB
 connectDB();
@@ -67,3 +68,4 @@ server.listen(PORT, () => {
 
 app.use('/api/vendor-ads', vendorAdRoutes);
 app.use('/api/location', locationRoutes);
+app.use('/api/vote', voteRoutes);
