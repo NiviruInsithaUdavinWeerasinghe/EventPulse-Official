@@ -21,6 +21,7 @@ import WalletActivated from './pages/WalletActivated.jsx';
 import PaymentQR from './pages/PaymentQR.jsx';
 import VendorPOS from './pages/VendorPOS.jsx';
 import VendorAnalytics from './pages/VendorAnalytics.jsx';
+import ScavengerHunt from './pages/ScavengerHunt.jsx';
 
 
 import VendorAdDashboard from './pages/VendorAdDashboard.jsx';
@@ -191,6 +192,15 @@ export default function AppRouter() {
       <Route path="/customer/wallet/pay" element={
         <ProtectedRoute allowedRoles={['customer']}>
           <PaymentQR />
+        </ProtectedRoute>
+      } />
+
+      {/* Scavenger Hunt — attendee/customer only */}
+      <Route path="/customer/scavenger-hunt" element={
+        <ProtectedRoute allowedRoles={['customer']}>
+          <MainLayout currentPage="scavenger-hunt" onNavigate={handleNavigate}>
+            <ScavengerHunt />
+          </MainLayout>
         </ProtectedRoute>
       } />
 

@@ -683,6 +683,37 @@ export default function CustomerDashboard() {
           </div>
         </div>
 
+        {/* ── Scavenger Hunt CTA ── */}
+        <div
+          id="scavenger-hunt-cta"
+          className="rounded-2xl overflow-hidden relative cursor-pointer group border border-indigo-500/30 bg-gradient-to-r from-indigo-900/20 via-purple-900/20 to-slate-900/30 hover:border-indigo-500/50 transition-all duration-300 shadow-lg shadow-indigo-500/5"
+          onClick={() => navigate('/customer/scavenger-hunt')}
+        >
+          <div className="relative z-10 p-7 flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles size={16} className="text-amber-400" />
+                <span className="text-xs font-bold text-amber-400 uppercase tracking-widest">
+                  Live Event Game
+                </span>
+              </div>
+              <h2 className="text-xl font-extrabold text-slate-900 dark:text-white mb-1 flex items-center gap-2">
+                Venue Scavenger Hunt 🗺️
+              </h2>
+              <p className="text-sm text-slate-500 dark:text-slate-300">
+                Scan hidden QR codes around venue zones using your camera to earn points!
+              </p>
+            </div>
+
+            <div
+              className="flex-shrink-0 px-4 py-2.5 rounded-xl flex items-center gap-2 font-bold text-xs bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-md shadow-indigo-600/30"
+            >
+              <QrCode size={16} />
+              Open Scanner
+            </div>
+          </div>
+        </div>
+
         {/* ── Browse Events CTA ── */}
         <div
           id="browse-events-cta"
