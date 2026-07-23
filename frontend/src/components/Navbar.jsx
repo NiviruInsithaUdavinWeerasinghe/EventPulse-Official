@@ -107,12 +107,20 @@ export default function Navbar({ currentPage, onNavigate }) {
             Events
           </a>
           {role === 'customer' && (
-            <Link
-              to="/customer/dashboard"
-              className="text-sm font-semibold text-slate-400 hover:text-slate-50 transition-colors duration-200 no-underline"
-            >
-              My Wallet
-            </Link>
+            <>
+              <Link
+                to="/customer/dashboard"
+                className="text-sm font-semibold text-slate-400 hover:text-slate-50 transition-colors duration-200 no-underline"
+              >
+                My Wallet
+              </Link>
+              <Link
+                to="/customer/scavenger-hunt"
+                className="text-sm font-semibold text-indigo-400 hover:text-indigo-300 transition-colors duration-200 no-underline flex items-center gap-1"
+              >
+                🎯 Scavenger Hunt
+              </Link>
+            </>
           )}
           {role === 'vendor' && (
             <Link
