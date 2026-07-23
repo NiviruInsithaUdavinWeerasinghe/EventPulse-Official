@@ -683,7 +683,7 @@ export default function CustomerDashboard() {
           </div>
         </div>
 
-        {/* ── Scavenger Hunt CTA ── */}
+{/* ── Scavenger Hunt CTA ── */}
         <div
           id="scavenger-hunt-cta"
           className="rounded-2xl overflow-hidden relative cursor-pointer group border border-indigo-500/30 bg-gradient-to-r from-indigo-900/20 via-purple-900/20 to-slate-900/30 hover:border-indigo-500/50 transition-all duration-300 shadow-lg shadow-indigo-500/5"

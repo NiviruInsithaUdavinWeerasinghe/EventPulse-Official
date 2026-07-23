@@ -131,7 +131,7 @@ export default function CandidateVotingGrid({ eventId, category }) {
           return (
             <div
               key={candidate._id}
-              className={`rounded-2xl border overflow-hidden transition-all duration-300 ${
+              className={`rounded-2xl border overflow-hidden transition-all duration-500 ${
                 hasVoted
                   ? 'grayscale opacity-70 border-white/[0.06]'
                   : 'border-white/[0.08] hover:border-indigo-500/40'
@@ -149,11 +149,11 @@ export default function CandidateVotingGrid({ eventId, category }) {
               <div className="p-4 flex flex-col gap-3">
                 <div>
                   <h3 className="text-sm font-bold text-slate-100">{candidate.name}</h3>
-                  {isThisVoted && (
-                    <p className="text-[0.65rem] text-emerald-400 font-semibold mt-0.5 flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" /> Your vote
-                    </p>
-                  )}
+                 {isThisVoted && (
+  <p className="text-[0.65rem] text-emerald-400 font-semibold mt-0.5 flex items-center gap-1 animate-pulse">
+    <CheckCircle2 className="w-3 h-3" /> Your vote
+  </p>
+)}
                 </div>
 
                 <button
