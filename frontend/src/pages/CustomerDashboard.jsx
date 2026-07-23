@@ -683,6 +683,8 @@ export default function CustomerDashboard() {
           </div>
         </div>
 
+       
+
         {/* ── Browse Events CTA ── */}
         <div
           id="browse-events-cta"
