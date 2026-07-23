@@ -21,9 +21,12 @@ import bookmarkRoutes from './routes/bookmarkRoutes.js';
 import flashSaleRoutes from './routes/flashSaleRoutes.js';
 import { startLocationBatchProcessor } from './services/locationBatchService.js';
 import voteRoutes from './routes/voteRoutes.js';
+import scavengerRoutes, { seedScavengerCodes } from './routes/scavengerRoutes.js';
 
 // Connect to MongoDB
-connectDB();
+connectDB().then(() => {
+  seedScavengerCodes();
+});
 
 // Initialize batch location updater
 startLocationBatchProcessor();
@@ -55,6 +58,7 @@ app.use('/api/reconciliation', reconciliationRoutes);
 app.use('/api/exports', exportRoutes);
 app.use('/api/bookmarks', bookmarkRoutes);
 app.use('/api/flash-sales', flashSaleRoutes);
+app.use('/api/scavenger', scavengerRoutes);
 
 // Wallet service routes (customer-only — JWT + role guard applied inside walletRoutes)
 app.use('/api/wallet', walletRoutes);
@@ -68,4 +72,4 @@ server.listen(PORT, () => {
 
 app.use('/api/vendor-ads', vendorAdRoutes);
 app.use('/api/location', locationRoutes);
-app.use('/api/vote', voteRoutes);
+app.use('/api/vote', voteRoutes);

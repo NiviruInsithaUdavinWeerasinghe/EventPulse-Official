@@ -14,6 +14,7 @@ const userSchema = new mongoose.Schema({
   latitude:      { type: Number },
   longitude:     { type: Number },
   lastPing:      { type: Date },
+  scavengerScore: { type: Number, default: 0 },
 }, { timestamps: true });
 
 userSchema.pre('save', async function (next) {
