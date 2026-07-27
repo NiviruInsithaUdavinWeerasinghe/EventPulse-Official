@@ -102,7 +102,7 @@ export default function VendorAnalytics() {
     if (!token) return;
 
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${wsProtocol}//${window.location.hostname}:5000/?token=${token}`;
+    const wsUrl = `${wsProtocol}//${window.location.hostname}:5050/?token=${token}`;
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
