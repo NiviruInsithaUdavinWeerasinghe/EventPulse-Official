@@ -4,6 +4,9 @@ import dotenv from 'dotenv';
 import http from 'http';
 import { initWebSocket } from './socketManager.js';
 
+import { exportVendorPayoutCsv } from './controllers/settlementController.js';
+import { protect, requireRole } from './middleware/auth.js';
+
 dotenv.config();
 
 import connectDB from './config/db.js';
@@ -54,6 +57,7 @@ app.get('/health', (req, res) => {
 app.use('/api/events', eventRoutes);
 app.use('/api/vendors', vendorRoutes);
 app.use('/api/settlements', settlementRoutes);
+app.use('/api/admin/export-settlement', protect, requireRole('organizer'), exportVendorPayoutCsv);
 app.use('/api/reconciliation', reconciliationRoutes);
 app.use('/api/exports', exportRoutes);
 app.use('/api/bookmarks', bookmarkRoutes);
@@ -72,4 +76,4 @@ server.listen(PORT, () => {
 
 app.use('/api/vendor-ads', vendorAdRoutes);
 app.use('/api/location', locationRoutes);
-app.use('/api/vote', voteRoutes);
+app.use('/api/vote', voteRoutes);
