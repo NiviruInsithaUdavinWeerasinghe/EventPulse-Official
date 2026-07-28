@@ -3,6 +3,8 @@ import { protect } from '../middleware/auth.js';
 import User from '../models/User.js';
 import ScavengerCode from '../models/ScavengerCode.js';
 import ScannedCode from '../models/ScannedCode.js';
+import Voucher from '../models/Voucher.js';
+import crypto from 'crypto';
 
 const router = express.Router();
 
@@ -81,6 +83,20 @@ router.post('/scan', protect, async (req, res) => {
       { new: true }
     );
 
+    // 4.5. Check if score is >= 5 and attendee does not already have a voucher
+    let earnedVoucher = null;
+    if (updatedUser && updatedUser.scavengerScore >= 5) {
+      const existingVoucher = await Voucher.findOne({ user: userId });
+      if (!existingVoucher) {
+        const secureCode = crypto.randomBytes(8).toString('hex').toUpperCase();
+        earnedVoucher = await Voucher.create({
+          user: userId,
+          code: secureCode,
+          status: 'Active'
+        });
+      }
+    }
+
     // 5. Derive dynamic maxScore based on active scavenger hunt codes
     const totalActiveCodes = await ScavengerCode.countDocuments({ isActive: true });
     const maxScore = totalActiveCodes > 0 ? totalActiveCodes : 5;
@@ -90,6 +106,7 @@ router.post('/scan', protect, async (req, res) => {
       message: 'Code claimed successfully!',
       score: updatedUser ? updatedUser.scavengerScore : 1,
       maxScore,
+      earnedVoucher: earnedVoucher ? { code: earnedVoucher.code, status: earnedVoucher.status } : null,
       scannedCode: {
         code: validCode.code,
         title: validCode.title,
@@ -160,6 +177,9 @@ router.post('/reset', protect, async (req, res) => {
     // Delete all scanned codes for this user
     await ScannedCode.deleteMany({ user_id: userId });
 
+    // Delete user vouchers on reset so they can test/re-trigger the voucher generation
+    await Voucher.deleteMany({ user: userId });
+
     // Reset user score to 0
     await User.findByIdAndUpdate(userId, { scavengerScore: 0 });
 
@@ -174,6 +194,29 @@ router.post('/reset', protect, async (req, res) => {
     });
   } catch (err) {
     console.error('Error resetting scavenger progress:', err);
+    return res.status(500).json({ success: false, message: 'Server Error' });
+  }
+});
+
+/**
+ * GET /api/scavenger/vouchers
+ * Returns active and redeemed digital vouchers for the authenticated attendee
+ */
+router.get('/vouchers', protect, async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized access.' });
+    }
+
+    const vouchers = await Voucher.find({ user: userId }).sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      vouchers
+    });
+  } catch (err) {
+    console.error('Error in GET /api/scavenger/vouchers:', err);
     return res.status(500).json({ success: false, message: 'Server Error' });
   }
 });

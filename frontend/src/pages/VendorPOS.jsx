@@ -58,10 +58,16 @@ export default function VendorPOS() {
       setErrorMessage('Could not read a token. Please try again.');
       return;
     }
-    if (!billAmount || parseFloat(billAmount) <= 0) {
+
+    // Detect if this is a 16-character voucher code
+    const isVoucher = tokenString.trim().length === 16;
+
+    if (!isVoucher && (!billAmount || parseFloat(billAmount) <= 0)) {
       setErrorMessage('Please enter a valid bill amount.');
       return;
     }
+
+    const finalAmount = isVoucher ? 0 : parseFloat(billAmount);
 
     setStatus('submitting');
     setErrorMessage('');
@@ -71,7 +77,7 @@ export default function VendorPOS() {
       const res = await fetch('/api/vendors/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
-        body: JSON.stringify({ token: tokenString.trim(), amount: parseFloat(billAmount) }),
+        body: JSON.stringify({ token: tokenString.trim(), amount: finalAmount }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
@@ -80,9 +86,10 @@ export default function VendorPOS() {
       } else {
         setStatus('success');
         setSuccessDetails({
-          amount: parseFloat(billAmount),
-          transactionId: data.transaction?.transactionId,
+          amount: finalAmount,
+          transactionId: data.transaction?.id || data.transaction?.transactionId,
           timestamp: data.transaction?.timestamp,
+          isVoucher: data.transaction?.isVoucher || isVoucher,
         });
       }
     } catch {
@@ -177,17 +184,28 @@ export default function VendorPOS() {
         {/* ── SUCCESS VIEW ─────────────────────────────────────── */}
         {status === 'success' ? (
           <div className="text-center py-8">
-            <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/25 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="w-10 h-10 text-emerald-400" />
+            <div className={`w-16 h-16 border rounded-full flex items-center justify-center mx-auto mb-4 ${
+              successDetails?.isVoucher
+                ? 'bg-amber-500/10 border-amber-500/25'
+                : 'bg-emerald-500/10 border-emerald-500/25'
+            }`}>
+              <CheckCircle className={`w-10 h-10 ${successDetails?.isVoucher ? 'text-amber-400' : 'text-emerald-400'}`} />
             </div>
-            <h2 className="text-lg font-bold text-slate-100 mb-2">Payment Successful</h2>
-            <p className="text-3xl font-extrabold text-slate-50 mb-6">
+            <h2 className="text-lg font-bold text-slate-100 mb-2">
+              {successDetails?.isVoucher ? '🎟️ Voucher Accepted' : 'Payment Successful'}
+            </h2>
+            <p className={`text-3xl font-extrabold mb-1 ${
+              successDetails?.isVoucher ? 'text-amber-400' : 'text-slate-50'
+            }`}>
               LKR {successDetails?.amount.toFixed(2)}
             </p>
-            <div className="bg-white/5 border border-white/[0.06] rounded-xl p-4 text-left text-xs mb-8 space-y-2 text-slate-400">
+            {successDetails?.isVoucher && (
+              <p className="text-xs text-amber-400/70 mb-5">Food Court Voucher — Zero charge applied</p>
+            )}
+            <div className="bg-white/5 border border-white/[0.06] rounded-xl p-4 text-left text-xs mb-8 space-y-2 text-slate-400 mt-4">
               <div className="flex justify-between">
                 <span>Transaction ID:</span>
-                <span className="font-mono text-slate-200">{String(successDetails?.transactionId)}</span>
+                <span className="font-mono text-slate-200">{String(successDetails?.transactionId || '—')}</span>
               </div>
               <div className="flex justify-between">
                 <span>Date & Time:</span>
@@ -200,7 +218,11 @@ export default function VendorPOS() {
             </div>
             <button
               onClick={resetPOS}
-              className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold rounded-xl transition-all cursor-pointer shadow-lg shadow-emerald-500/20"
+              className={`w-full py-3 font-bold rounded-xl transition-all cursor-pointer shadow-lg ${
+                successDetails?.isVoucher
+                  ? 'bg-amber-500 hover:bg-amber-600 text-slate-900 shadow-amber-500/20'
+                  : 'bg-emerald-500 hover:bg-emerald-600 text-slate-900 shadow-emerald-500/20'
+              }`}
             >
               Next Checkout
             </button>
@@ -362,13 +384,19 @@ export default function VendorPOS() {
                   )}
 
                   {/* Show submit button if QR decoded but bill amount wasn't set at time of scan */}
-                  {uploadDecodeStatus === 'decoded' && paymentToken && isBillValid && status === 'idle' && (
+                  {uploadDecodeStatus === 'decoded' && paymentToken && status === 'idle' && (paymentToken.trim().length === 16 || isBillValid) && (
                     <button
                       onClick={() => handleCheckoutSubmit(paymentToken)}
-                      className="w-full mt-2 py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
+                      className={`w-full mt-2 py-3 font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                        paymentToken.trim().length === 16
+                          ? 'bg-amber-500 hover:bg-amber-600 text-slate-900'
+                          : 'bg-emerald-500 hover:bg-emerald-600 text-slate-900'
+                      }`}
                     >
                       <ShieldCheck className="w-4 h-4" />
-                      Confirm Payment — LKR {parseFloat(billAmount).toFixed(2)}
+                      {paymentToken.trim().length === 16
+                        ? '🎟️ Redeem Voucher — LKR 0.00'
+                        : `Confirm Payment — LKR ${parseFloat(billAmount).toFixed(2)}`}
                     </button>
                   )}
                 </div>
