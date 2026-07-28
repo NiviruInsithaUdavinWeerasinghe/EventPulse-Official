@@ -106,6 +106,16 @@ export default function SettlementAudit() {
           Revenue Ledger
         </button>
         <button
+          onClick={() => setActiveSubTab('vendor-payouts')}
+          className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            activeSubTab === 'vendor-payouts'
+              ? 'bg-white dark:bg-zinc-950 text-slate-900 dark:text-white shadow-xs'
+              : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+          }`}
+        >
+          Vendor Payouts
+        </button>
+        <button
           onClick={() => setActiveSubTab('reconciliation')}
           className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
             activeSubTab === 'reconciliation'
@@ -117,7 +127,13 @@ export default function SettlementAudit() {
         </button>
       </div>
 
-      {activeSubTab === 'ledger' ? <RevenueLedgerTab /> : <ReconciliationTab />}
+      {activeSubTab === 'ledger' ? (
+        <RevenueLedgerTab />
+      ) : activeSubTab === 'vendor-payouts' ? (
+        <VendorPayoutsTab />
+      ) : (
+        <ReconciliationTab />
+      )}
 
     </div>
   );
@@ -604,3 +620,163 @@ function ReconciliationSection({ title, description, rows, emptyLabel, columns }
     </div>
   );
 }
+
+// ── Tab 3: Vendor Payouts report (US-603) ─────────────────────────────
+function VendorPayoutsTab() {
+  const navigate = useNavigate();
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [exporting, setExporting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await authFetch('/api/settlements/vendor-payouts');
+        const body = await res.json();
+        if (!res.ok || !body.success) throw new Error(body.message || 'Failed to load vendor payout report.');
+        if (!cancelled) setData(body.data);
+      } catch (err) {
+        if (cancelled) return;
+        if (err instanceof ApiAuthError) {
+          setError(err);
+          setTimeout(() => navigate('/login'), 2000);
+        } else {
+          setError(err);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [navigate]);
+
+  const handleExportCsv = async () => {
+    try {
+      setExporting(true);
+      await downloadFile('/api/admin/export-settlement', 'event_vendor_payouts_final.csv');
+    } catch (err) {
+      if (err instanceof ApiAuthError) navigate('/login');
+      else alert(err.message || 'CSV Export failed.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  if (error instanceof ApiAuthError) return <AccessDenied message={error.message} />;
+  if (loading) return <LoadingState label="Loading vendor payout data…" />;
+  if (error) return <ErrorState title="Couldn't load vendor payouts" message={error.message} />;
+
+  const { summary, vendors, splitPercentage } = data;
+
+  const filteredVendors = vendors.filter(
+    (v) =>
+      v.vendorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      v.vendorId.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Vendor Financial Settlement</h2>
+          <p className="text-xs text-slate-500">Platform split percentage rate: {splitPercentage}%</p>
+        </div>
+        <button
+          onClick={handleExportCsv}
+          disabled={exporting}
+          className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-semibold text-xs md:text-sm px-4 py-2.5 rounded-xl shadow-sm cursor-pointer transition-all"
+        >
+          {exporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+          {exporting ? 'Exporting CSV…' : 'Export CSV'}
+        </button>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
+        <div className="bg-white dark:bg-zinc-900/40 border border-slate-200/80 dark:border-zinc-800/80 rounded-2xl p-5 shadow-sm">
+          <span className="text-xs font-semibold text-slate-500 uppercase">Total Vendors</span>
+          <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white mt-1">{summary.totalVendors}</h3>
+        </div>
+
+        <div className="bg-white dark:bg-zinc-900/40 border border-slate-200/80 dark:border-zinc-800/80 rounded-2xl p-5 shadow-sm">
+          <span className="text-xs font-semibold text-slate-500 uppercase">Gross Revenue (LKR)</span>
+          <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white mt-1">
+            Rs. {summary.totalGrossRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          </h3>
+        </div>
+
+        <div className="bg-white dark:bg-zinc-900/40 border border-slate-200/80 dark:border-zinc-800/80 rounded-2xl p-5 shadow-sm">
+          <span className="text-xs font-semibold text-slate-500 uppercase">Platform Fee ({splitPercentage}%)</span>
+          <h3 className="text-2xl font-extrabold text-amber-600 dark:text-amber-400 mt-1">
+            Rs. {summary.totalPlatformFee.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          </h3>
+        </div>
+
+        <div className="bg-white dark:bg-zinc-900/40 border border-slate-200/80 dark:border-zinc-800/80 rounded-2xl p-5 shadow-sm">
+          <span className="text-xs font-semibold text-slate-500 uppercase">Final Net Payouts (LKR)</span>
+          <h3 className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-1">
+            Rs. {summary.totalNetPayout.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          </h3>
+        </div>
+      </div>
+
+      {/* Toolbar & Search */}
+      <div className="flex justify-between items-center bg-white dark:bg-zinc-900/40 p-4 border border-slate-200/80 dark:border-zinc-800/80 rounded-xl">
+        <div className="relative max-w-xs w-full">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search vendor name or ID..."
+            className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-lg text-xs font-semibold focus:outline-none"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="bg-white dark:bg-zinc-900/40 border border-slate-200/80 dark:border-zinc-800/80 rounded-2xl p-6 shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="border-b border-slate-100 dark:border-zinc-800 text-slate-400 font-semibold uppercase tracking-wider">
+                <th className="pb-3 pr-4">Vendor ID</th>
+                <th className="pb-3 px-4">Vendor Name</th>
+                <th className="pb-3 px-4">Total Scans</th>
+                <th className="pb-3 px-4">Gross Revenue (LKR)</th>
+                <th className="pb-3 px-4">Platform Fee ({splitPercentage}%)</th>
+                <th className="pb-3 px-4">Final Net Payout (LKR)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-zinc-800 text-slate-700 dark:text-slate-300 font-medium">
+              {filteredVendors.length > 0 ? (
+                filteredVendors.map((v) => (
+                  <tr key={v.vendorId} className="hover:bg-slate-50/50 dark:hover:bg-zinc-800/20">
+                    <td className="py-3.5 pr-4 font-mono font-semibold text-slate-900 dark:text-white">{v.vendorId}</td>
+                    <td className="py-3.5 px-4 font-bold">{v.vendorName}</td>
+                    <td className="py-3.5 px-4 font-semibold">{v.totalScans}</td>
+                    <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">Rs. {v.grossRevenue.toFixed(2)}</td>
+                    <td className="py-3.5 px-4 text-amber-600 font-semibold">-Rs. {v.platformFee.toFixed(2)}</td>
+                    <td className="py-3.5 px-4 text-emerald-600 font-extrabold">Rs. {v.netPayout.toFixed(2)}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="6" className="py-8 text-center text-slate-400">
+                    No vendor payout records found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
