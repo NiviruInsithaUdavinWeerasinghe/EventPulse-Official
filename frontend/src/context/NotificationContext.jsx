@@ -21,6 +21,15 @@ export function NotificationProvider({ children }) {
   const updateBalance = async () => {
     const token = localStorage.getItem('token');
     if (!token) return;
+
+    // Only customers have wallets, skip call for other roles
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      if (payload.role !== 'customer') return;
+    } catch (e) {
+      return;
+    }
+
     try {
       const res = await fetch('/api/wallet/init', {
         method: 'POST',

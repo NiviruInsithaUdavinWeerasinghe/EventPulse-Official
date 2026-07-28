@@ -25,6 +25,7 @@ import flashSaleRoutes from './routes/flashSaleRoutes.js';
 import { startLocationBatchProcessor } from './services/locationBatchService.js';
 import voteRoutes from './routes/voteRoutes.js';
 import scavengerRoutes, { seedScavengerCodes } from './routes/scavengerRoutes.js';
+import heatmapRoutes from './routes/heatmapRoutes.js';
 
 // Connect to MongoDB
 connectDB().then(() => {
@@ -63,6 +64,7 @@ app.use('/api/exports', exportRoutes);
 app.use('/api/bookmarks', bookmarkRoutes);
 app.use('/api/flash-sales', flashSaleRoutes);
 app.use('/api/scavenger', scavengerRoutes);
+app.use('/api/heatmap', heatmapRoutes);
 
 // Wallet service routes (customer-only — JWT + role guard applied inside walletRoutes)
 app.use('/api/wallet', walletRoutes);
