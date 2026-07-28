@@ -30,7 +30,7 @@ export const initWebSocket = (server) => {
 
     if (token) {
       try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'eventpulse_secret');
         userId = decoded.id;
         if (userId) {
           if (!clientSockets.has(userId)) {
@@ -53,7 +53,7 @@ export const initWebSocket = (server) => {
       try {
         const data = JSON.parse(message);
         if (data.type === 'auth' && data.token) {
-          const decoded = jwt.verify(data.token, process.env.JWT_SECRET);
+          const decoded = jwt.verify(data.token, process.env.JWT_SECRET || 'eventpulse_secret');
           userId = decoded.id;
           if (userId) {
             if (!clientSockets.has(userId)) {
