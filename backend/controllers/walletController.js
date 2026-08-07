@@ -35,22 +35,33 @@ export const initWallet = async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found.' });
     }
-    if (user.role !== 'customer') {
+    if (user.role !== 'customer' && user.role !== 'vendor') {
       return res.status(403).json({
         success: false,
-        message: 'Wallet accounts can only be created for Event Attendees (customer role).',
+        message: 'Wallet accounts can only be created for customer or vendor roles.',
       });
     }
 
     // Find existing wallet or create a new one defaulting to LKR 0.00
     let wallet = await Wallet.findOne({ user: req.user.id });
-    const isNew = !wallet;
+    let isNew = false;
 
     if (!wallet) {
-      wallet = await Wallet.create({
-        user: req.user.id,
-        // balance defaults to Decimal128("0.00") per the schema
-      });
+      try {
+        wallet = await Wallet.create({
+          user: req.user.id,
+          // balance defaults to Decimal128("0.00") per the schema
+        });
+        isNew = true;
+      } catch (err) {
+        if (err.code === 11000) {
+          // A concurrent request created it in parallel — retrieve the newly created wallet
+          wallet = await Wallet.findOne({ user: req.user.id });
+          isNew = false;
+        } else {
+          throw err;
+        }
+      }
     }
 
     return res.status(isNew ? 201 : 200).json({
