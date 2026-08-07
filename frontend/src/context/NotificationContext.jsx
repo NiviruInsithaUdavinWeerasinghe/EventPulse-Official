@@ -60,10 +60,12 @@ export function NotificationProvider({ children }) {
       if (!currentToken) return;
 
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      // In development, bind to port 5000 (backend). In production, same host.
-      const wsUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-        ? `ws://${window.location.hostname}:5000/?token=${currentToken}`
-        : `${wsProtocol}//${window.location.host}/ws?token=${currentToken}`;
+      // In development, bind to port 5000 (backend). In production, use VITE_WS_URL or same host.
+      const wsUrl = import.meta.env.VITE_WS_URL
+        ? `${import.meta.env.VITE_WS_URL}/?token=${currentToken}`
+        : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+          ? `ws://${window.location.hostname}:5000/?token=${currentToken}`
+          : `${wsProtocol}//${window.location.host}/ws?token=${currentToken}`);
 
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
