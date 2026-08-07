@@ -32,6 +32,10 @@ const voteSchema = new mongoose.Schema(
 // One vote per user per category per event — enforced at the database level
 voteSchema.index({ eventId: 1, userId: 1, category: 1 }, { unique: true });
 
+// EP-21: Supports the leaderboard's GROUP BY candidateId aggregation —
+// lets $match(eventId, category) + $group(candidateId) run as an index scan.
+voteSchema.index({ eventId: 1, category: 1, candidateId: 1 });
+
 const Vote = mongoose.model('Vote', voteSchema);
 
 export default Vote;

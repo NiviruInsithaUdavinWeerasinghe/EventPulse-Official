@@ -13,11 +13,12 @@ import {
   X, 
   Search, 
   Bell, 
-  ChevronDown, 
+  ChevronDown,
   CheckCircle,
   AlertCircle,
   FileText,
   BarChart3,
+  Trophy,
   User
 } from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle.jsx';
@@ -33,6 +34,7 @@ import SupportView from '../components/organizer/SupportView.jsx';
 import CreateEvent from './CreateEvent.jsx';
 import ScheduleManager from '../components/organizer/ScheduleManager.jsx';
 import AnalyticsView from '../components/organizer/AnalyticsView.jsx';
+import VoteLeaderboard from '../components/organizer/VoteLeaderboard.jsx';
 
 export default function OrganizerDashboard() {
   const navigate = useNavigate();
@@ -130,6 +132,7 @@ export default function OrganizerDashboard() {
   const mainNavs = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'analytics', label: 'Visitor Analytics', icon: BarChart3 },
+    { id: 'leaderboard', label: 'Vote Leaderboard', icon: Trophy },
     { id: 'events', label: 'Event Management', icon: Calendar },
     { id: 'schedule', label: 'Schedule Manager', icon: Calendar },
     { id: 'blueprints', label: 'Blueprint / Map Uploads', icon: Map },
@@ -263,6 +266,8 @@ export default function OrganizerDashboard() {
         return <MainDashboard setActiveTab={setActiveTab} searchQuery={searchQuery} />;
       case 'analytics':
         return <AnalyticsView />;
+      case 'leaderboard':
+        return <VoteLeaderboard />;
       case 'events':
         return <EventManagement searchQuery={searchQuery} />;
       case 'schedule':
