@@ -18,6 +18,7 @@ import {
   AlertTriangle,
   CheckCircle,
   Database,
+  Gift,
 } from 'lucide-react';
 
 
@@ -149,6 +150,70 @@ function TicketQrModal({ ticket, onClose }) {
               : 'linear-gradient(135deg, rgba(99,102,241,0.1), rgba(168,85,247,0.1))',
             color: isDarkMode ? '#a5b4fc' : '#4f46e5',
             border: isDarkMode ? '1px solid rgba(99,102,241,0.25)' : '1px solid rgba(99,102,241,0.15)',
+          }}
+        >
+          Tap anywhere to close
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Voucher QR Modal ──────────────────────────────────── */
+function VoucherQrModal({ voucher, onClose }) {
+  const { isDarkMode } = useTheme();
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=10&data=${encodeURIComponent(voucher.code)}`;
+  const isRedeemed = voucher.status === 'Redeemed';
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backdropFilter: 'blur(12px)', background: isDarkMode ? 'rgba(3,7,18,0.88)' : 'rgba(15,23,42,0.45)' }}
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-xs rounded-3xl p-7 text-center border bg-white dark:bg-gradient-to-br dark:from-[#100c00] dark:to-[#0a0f1e] border-slate-200 dark:border-amber-500/35 shadow-xl dark:shadow-[0_0_60px_rgba(245,158,11,0.2)]"
+        onClick={e => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors"
+        >
+          <X size={18} />
+        </button>
+
+        <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3" style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.25)' }}>
+          <Gift size={22} className="text-amber-400" />
+        </div>
+        <p className="text-xs text-amber-400 uppercase tracking-widest mb-1 font-bold">Food Court Voucher</p>
+        <p className="text-base font-bold text-slate-900 dark:text-white mb-0.5">
+          {isRedeemed ? 'Already Redeemed' : 'Show at Food Court POS'}
+        </p>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-5">
+          {isRedeemed
+            ? `Redeemed on ${new Date(voucher.redeemedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+            : 'Scan this QR code at any participating food court vendor to claim your free meal.'}
+        </p>
+
+        <div
+          className="mx-auto rounded-2xl p-3 mb-5 border border-slate-200 dark:border-white/10"
+          style={{ background: 'white', width: 196, height: 196, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: isRedeemed ? 0.45 : 1 }}
+        >
+          <img src={qrUrl} alt="Voucher QR code" width={180} height={180} style={{ display: 'block' }} />
+        </div>
+
+        {!isRedeemed && (
+          <p className="text-[10px] font-mono text-slate-400 dark:text-slate-500 mb-4 tracking-widest">{voucher.code}</p>
+        )}
+
+        <div
+          className="rounded-xl py-2 px-4 text-xs font-semibold"
+          style={{
+            background: isDarkMode
+              ? 'linear-gradient(135deg, rgba(245,158,11,0.15), rgba(234,88,12,0.15))'
+              : 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(234,88,12,0.08))',
+            color: isDarkMode ? '#fbbf24' : '#b45309',
+            border: isDarkMode ? '1px solid rgba(245,158,11,0.2)' : '1px solid rgba(245,158,11,0.15)',
           }}
         >
           Tap anywhere to close
@@ -444,6 +509,8 @@ export default function CustomerDashboard() {
   const [tickets, setTickets] = useState([]);
   const [selectedTicket, setSelectedTicket] = useState(null); // for ticket QR modal
   const [transactions, setTransactions] = useState([]);
+  const [vouchers, setVouchers] = useState([]);
+  const [selectedVoucher, setSelectedVoucher] = useState(null); // for voucher QR modal
 
   useEffect(() => {
     const h = new Date().getHours();
@@ -463,6 +530,16 @@ export default function CustomerDashboard() {
           const ticketsData = await ticketsRes.json();
           if (ticketsData.success) {
             setTickets(ticketsData.data);
+          }
+
+          // Fetch earned vouchers
+          const token = localStorage.getItem('token');
+          const vouchersRes = await fetch('/api/scavenger/vouchers', {
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          if (vouchersRes.ok) {
+            const vouchersData = await vouchersRes.json();
+            if (vouchersData.success) setVouchers(vouchersData.vouchers || []);
           }
         } catch (err) {
           console.error("Dashboard fetch error:", err);
@@ -519,6 +596,10 @@ export default function CustomerDashboard() {
     >
       {selectedTicket && (
         <TicketQrModal ticket={selectedTicket} onClose={() => setSelectedTicket(null)} />
+      )}
+
+      {selectedVoucher && (
+        <VoucherQrModal voucher={selectedVoucher} onClose={() => setSelectedVoucher(null)} />
       )}
 
       <TopUpModal 
@@ -713,6 +794,72 @@ export default function CustomerDashboard() {
             </div>
           </div>
         </div>
+
+        {/* ── My Rewards (Vouchers) ── */}
+        {vouchers.length > 0 && (
+          <div id="my-rewards-section">
+            <div className="flex items-center gap-2 mb-4">
+              <Gift size={16} className="text-amber-400" />
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">My Rewards</h2>
+              <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full" style={{ background: 'rgba(245,158,11,0.12)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.2)' }}>
+                {vouchers.filter(v => v.status === 'Active').length} Active
+              </span>
+            </div>
+
+            <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'thin' }}>
+              {vouchers.map(v => {
+                const isRedeemed = v.status === 'Redeemed';
+                return (
+                  <div
+                    key={v._id}
+                    onClick={() => setSelectedVoucher(v)}
+                    className={`relative rounded-2xl overflow-hidden flex-shrink-0 w-60 cursor-pointer transition-all duration-300 border ${
+                      isRedeemed
+                        ? 'opacity-55 border-slate-300/30 dark:border-white/[0.04] bg-slate-100 dark:bg-white/[0.01]'
+                        : 'border-amber-500/30 bg-gradient-to-br from-amber-950/20 to-slate-900/30 dark:from-amber-900/10 dark:to-slate-900/20 shadow-lg shadow-amber-500/10'
+                    }`}
+                    onMouseEnter={e => { if (!isRedeemed) e.currentTarget.style.transform = 'translateY(-4px)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; }}
+                  >
+                    <div className={`h-1 w-full ${isRedeemed ? 'bg-slate-300 dark:bg-white/10' : 'bg-gradient-to-r from-amber-400 to-orange-500'}`} />
+                    <div className="p-5">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md ${
+                          isRedeemed
+                            ? 'bg-slate-200/50 dark:bg-white/5 text-slate-500 dark:text-slate-400'
+                            : 'bg-amber-500/10 border border-amber-500/20 text-amber-500 dark:text-amber-300'
+                        }`}>
+                          {isRedeemed ? 'Redeemed' : 'Active'}
+                        </span>
+                        <Gift size={14} className={isRedeemed ? 'text-slate-400' : 'text-amber-400'} />
+                      </div>
+
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">Food Court Voucher</h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+                        {isRedeemed ? 'This voucher has been used.' : 'Free checkout at participating food court vendors.'}
+                      </p>
+
+                      <div
+                        className="my-3"
+                        style={{ borderTop: '1px dashed rgba(245,158,11,0.2)' }}
+                      />
+
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-[10px] text-slate-500 uppercase tracking-wide">Value</p>
+                          <p className={`text-sm font-bold ${isRedeemed ? 'text-slate-400' : 'text-amber-400'}`}>LKR 0.00 Free</p>
+                        </div>
+                        <div className="p-2 rounded-lg" style={{ background: isRedeemed ? 'rgba(255,255,255,0.03)' : 'rgba(245,158,11,0.08)' }}>
+                          <QrCode size={18} className={isRedeemed ? 'text-slate-500' : 'text-amber-400'} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* ── Browse Events CTA ── */}
         <div

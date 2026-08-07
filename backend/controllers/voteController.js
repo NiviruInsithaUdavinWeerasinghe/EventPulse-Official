@@ -30,6 +30,87 @@ export const getVoteStatus = async (req, res) => {
   }
 };
 
+// ── EP-21: List distinct voting categories for an event (leaderboard selector) ──
+// GET /api/vote/categories/:eventId
+export const getCategories = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const categories = await Candidate.distinct('category', { eventId });
+    res.status(200).json({ success: true, data: categories.sort() });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── EP-21: Organizer-facing leaderboard — candidates ranked by vote count ──
+// GET /api/vote/leaderboard/:eventId/:category
+//
+// Tallies the *raw* votes collection live (GROUP BY candidateId, COUNT(*),
+// ORDER BY count DESC) rather than trusting the denormalized Candidate.totalVotes
+// counter, so the leaderboard reflects an independently-verifiable source of truth.
+// The { eventId, category, candidateId } index on Vote (see models/Vote.js) lets
+// the $match + $group stages run as an index scan instead of a full collection scan.
+export const getLeaderboard = async (req, res) => {
+  try {
+    const { eventId, category } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(eventId)) {
+      return res.status(400).json({ success: false, message: 'Invalid Event ID.' });
+    }
+
+    const eventObjectId = new mongoose.Types.ObjectId(eventId);
+
+    // Core tally: GROUP BY candidateId over the votes collection, COUNT(*) per
+    // group, ORDER BY that count descending — the highest-voted candidate first.
+    const tally = await Vote.aggregate([
+      { $match: { eventId: eventObjectId, category } },
+      { $group: { _id: '$candidateId', voteCount: { $sum: 1 } } },
+      { $sort: { voteCount: -1 } },
+      {
+        $lookup: {
+          from: 'candidates',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'candidate',
+        },
+      },
+      { $unwind: '$candidate' },
+      {
+        $project: {
+          _id: '$candidate._id',
+          name: '$candidate.name',
+          photoUrl: '$candidate.photoUrl',
+          voteCount: 1,
+        },
+      },
+    ]);
+
+    // Candidates with zero votes have no rows in the votes collection, so they
+    // can never surface from the GROUP BY above — append them at the bottom
+    // so the leaderboard still lists every candidate registered in this category.
+    const talliedIds = tally.map((t) => t._id);
+    const untallied = await Candidate.find({
+      eventId: eventObjectId,
+      category,
+      _id: { $nin: talliedIds },
+    })
+      .select('name photoUrl')
+      .sort({ name: 1 });
+
+    const leaderboard = [
+      ...tally,
+      ...untallied.map((c) => ({ _id: c._id, name: c.name, photoUrl: c.photoUrl, voteCount: 0 })),
+    ];
+
+    const totalVotes = leaderboard.reduce((sum, c) => sum + c.voteCount, 0);
+
+    res.status(200).json({ success: true, data: leaderboard, totalVotes });
+  } catch (error) {
+    console.error('getLeaderboard error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // ── EP-136: Cast a vote — fully atomic, race-condition safe ────────────────
 // POST /api/vote
 // body: { eventId, userId, category, candidateId }

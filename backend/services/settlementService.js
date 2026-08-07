@@ -87,3 +87,85 @@ export const getSettlementData = async () => {
     transactions,
   };
 };
+
+// Computes the vendor financial settlement report (US-603)
+export const getVendorPayoutData = async () => {
+  const splitPercentageRaw = parseFloat(process.env.PLATFORM_SPLIT_PERCENTAGE) || 5.0;
+  const splitRate = splitPercentageRaw / 100;
+
+  // Import models inside service method or top level
+  const PaymentTokenModule = await import('../models/PaymentToken.js');
+  const UserModule = await import('../models/User.js');
+  const PaymentToken = PaymentTokenModule.default;
+  const User = UserModule.default;
+
+  // Fetch all tokens with status 'Used'
+  const usedTokens = await PaymentToken.find({ status: 'Used' }).populate('vendorId', 'fullName email');
+
+  // Group by vendor
+  const vendorMap = new Map();
+
+  // Populate vendor map with all vendor users first if required or from tokens
+  const vendorUsers = await User.find({ role: 'vendor' });
+  for (const v of vendorUsers) {
+    vendorMap.set(String(v._id), {
+      vendorId: String(v._id),
+      vendorName: v.fullName || v.email || 'Unknown Vendor',
+      totalScans: 0,
+      grossRevenue: 0,
+      platformFee: 0,
+      netPayout: 0,
+    });
+  }
+
+  for (const token of usedTokens) {
+    if (!token.vendorId) continue;
+    const vId = String(token.vendorId._id || token.vendorId);
+    if (!vendorMap.has(vId)) {
+      vendorMap.set(vId, {
+        vendorId: vId,
+        vendorName: token.vendorId.fullName || token.vendorId.email || 'Unknown Vendor',
+        totalScans: 0,
+        grossRevenue: 0,
+        platformFee: 0,
+        netPayout: 0,
+      });
+    }
+
+    const entry = vendorMap.get(vId);
+    const amount = token.debitedAmount ? parseFloat(token.debitedAmount.toString()) : 0;
+    entry.totalScans += 1;
+    entry.grossRevenue = round2(entry.grossRevenue + amount);
+  }
+
+  // Calculate platform fee & net payout per vendor with 2 decimal places rounding
+  const vendors = Array.from(vendorMap.values()).map((v) => {
+    const grossRevenue = round2(v.grossRevenue);
+    const platformFee = round2(grossRevenue * splitRate);
+    const netPayout = round2(grossRevenue - platformFee);
+    return {
+      ...v,
+      grossRevenue,
+      platformFee,
+      netPayout,
+    };
+  });
+
+  const totalScans = vendors.reduce((acc, v) => acc + v.totalScans, 0);
+  const totalGrossRevenue = round2(vendors.reduce((acc, v) => acc + v.grossRevenue, 0));
+  const totalPlatformFee = round2(vendors.reduce((acc, v) => acc + v.platformFee, 0));
+  const totalNetPayout = round2(totalGrossRevenue - totalPlatformFee);
+
+  return {
+    splitPercentage: splitPercentageRaw,
+    summary: {
+      totalVendors: vendors.length,
+      totalScans,
+      totalGrossRevenue,
+      totalPlatformFee,
+      totalNetPayout,
+    },
+    vendors,
+  };
+};
+

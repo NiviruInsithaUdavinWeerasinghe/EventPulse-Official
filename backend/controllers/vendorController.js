@@ -4,6 +4,7 @@ import WalletLedger from '../models/WalletLedger.js';
 import PaymentToken from '../models/PaymentToken.js';
 import User from '../models/User.js';
 import VendorApplication from '../models/VendorApplication.js';
+import Voucher from '../models/Voucher.js';
 import { sendNotification } from '../socketManager.js';
 
 /**
@@ -21,7 +22,95 @@ export const processVendorCheckout = async (req, res) => {
     }
 
     const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
+    if (isNaN(numAmount) || numAmount < 0) {
+      return res.status(400).json({ success: false, message: 'Invalid payment amount.' });
+    }
+
+    // ── Intercept Voucher scan reward redemption (must check BEFORE amount > 0 guard) ──
+    const voucher = await Voucher.findOne({ code: token });
+    if (voucher) {
+      if (voucher.status !== 'Active') {
+        return res.status(400).json({
+          success: false,
+          message: `This voucher code has already been ${voucher.status.toLowerCase()}.`,
+        });
+      }
+
+      // Mark voucher as Redeemed
+      voucher.status = 'Redeemed';
+      voucher.redeemedAt = new Date();
+      await voucher.save();
+
+      // Look up user's wallet
+      const wallet = await Wallet.findOne({ user: voucher.user }).populate('user');
+      const customerUserId = voucher.user.toString();
+      const currentBalance = wallet ? parseFloat(wallet.balance.toString()) : 0;
+
+      // Create a zero-value ledger entry
+      let ledgerId = null;
+      if (wallet) {
+        const ledger = await WalletLedger.create({
+          wallet: wallet._id,
+          transactionType: 'Debit',
+          amount: mongoose.Types.Decimal128.fromString('0.00'),
+          balanceBefore: mongoose.Types.Decimal128.fromString(currentBalance.toFixed(2)),
+          balanceAfter: mongoose.Types.Decimal128.fromString(currentBalance.toFixed(2)),
+          description: `Digital Voucher Redeemed: ${voucher.code}`,
+          referenceType: 'Voucher',
+          referenceId: voucher._id.toString(),
+        });
+        ledgerId = ledger._id.toString();
+      }
+
+      // Fetch vendor details
+      const vendorUser = await User.findById(req.user.id);
+      const vendorName = vendorUser ? vendorUser.fullName : 'Stall Vendor';
+
+      // Find active approved vendor application
+      const vendorApp = await VendorApplication.findOne({ vendorId: req.user.id, status: 'Approved' }).sort({ updatedAt: -1 });
+      const eventId = vendorApp ? vendorApp.eventId : null;
+
+      // Broadcast success to attendee's screen (triggers global success modal overlay)
+      sendNotification(customerUserId, {
+        type: 'TX_SUCCESS',
+        message: 'Voucher redeemed successfully!',
+        amount: 0,
+        vendorName,
+        remainingBalance: currentBalance,
+        timestamp: new Date(),
+      });
+
+      // Broadcast real-time success to vendor dashboard
+      sendNotification(req.user.id.toString(), {
+        type: 'VENDOR_SALE_SUCCESS',
+        message: 'Voucher checkout recorded.',
+        sale: {
+          transactionId: ledgerId || voucher._id.toString(),
+          customerName: wallet && wallet.user ? wallet.user.fullName : 'Customer',
+          grossAmount: 0,
+          platformSplit: 0,
+          netAmount: 0,
+          timestamp: new Date(),
+          eventId: eventId ? eventId.toString() : null,
+          isVoucher: true
+        }
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Voucher redeemed successfully.',
+        transaction: {
+          id: ledgerId || voucher._id.toString(),
+          amount: 0,
+          description: `Voucher Redeemed: ${voucher.code}`,
+          isVoucher: true,
+          timestamp: voucher.redeemedAt,
+        }
+      });
+    }
+
+    // Guard: standard payment must be positive
+    if (numAmount <= 0) {
       return res.status(400).json({ success: false, message: 'Invalid payment amount. Must be a positive number.' });
     }
 

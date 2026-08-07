@@ -101,13 +101,13 @@ export default function VendorAnalytics() {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = import.meta.env.VITE_WS_URL
       ? `${import.meta.env.VITE_WS_URL}/?token=${token}`
       : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-        ? `ws://${window.location.hostname}:5000/?token=${token}`
+        ? `ws://${window.location.hostname}:5050/?token=${token}`
         : `${wsProtocol}//${window.location.host}/ws?token=${token}`);
     const ws = new WebSocket(wsUrl);
+
 
     ws.onopen = () => {
       setWsConnected(true);

@@ -7,7 +7,10 @@ import {
   Clock, 
   AlertCircle, 
   ChevronDown, 
-  Loader2 
+  Loader2,
+  Play,
+  Pause,
+  RotateCcw
 } from 'lucide-react';
 import { Chart, registerables } from 'chart.js';
 
@@ -30,6 +33,195 @@ export default function AnalyticsView() {
 
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
+
+  // Heatmap Replay States
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [sliderVal, setSliderVal] = useState(600); // 10:00 AM (600 minutes)
+  const [playbackSpeed, setPlaybackSpeed] = useState(2000); // 2 seconds per tick
+  const [heatmapData, setHeatmapData] = useState(null);
+  const [loadingHeatmap, setLoadingHeatmap] = useState(false);
+
+  const canvasRef = useRef(null);
+
+  // Time formatter helper
+  const formatTime = (minutes) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const dispHours = hours % 12 === 0 ? 12 : hours % 12;
+    const dispMins = mins < 10 ? `0${mins}` : mins;
+    return `${dispHours}:${dispMins} ${ampm}`;
+  };
+
+  // Replay playback logic
+  useEffect(() => {
+    let interval = null;
+    if (isPlaying) {
+      interval = setInterval(() => {
+        setSliderVal((prev) => {
+          if (prev >= 1439) { // Stop at 11:59 PM (1439 minutes)
+            setIsPlaying(false);
+            return 1439;
+          }
+          return prev + 15;
+        });
+      }, playbackSpeed);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isPlaying, playbackSpeed]);
+
+  // Fetch heatmap data
+  useEffect(() => {
+    if (!selectedEventId) {
+      console.log('[HEATMAP FRONTEND] selectedEventId is empty, skipping fetch.');
+      return;
+    }
+
+    const selectedEvent = events.find(e => e._id === selectedEventId);
+    const targetDate = selectedEvent?.date ? new Date(selectedEvent.date) : new Date();
+    const hours = Math.floor(sliderVal / 60);
+    const minutes = sliderVal % 60;
+    targetDate.setHours(hours);
+    targetDate.setMinutes(minutes);
+    targetDate.setSeconds(0);
+    targetDate.setMilliseconds(0);
+
+    const timeISO = targetDate.toISOString();
+    console.log('[HEATMAP FRONTEND] Selected Event Name:', selectedEvent?.name, 'ID:', selectedEventId);
+    console.log('[HEATMAP FRONTEND] Slider Val:', sliderVal, 'converted to hours:', hours, 'minutes:', minutes);
+    console.log('[HEATMAP FRONTEND] Target ISO Timestamp:', timeISO);
+
+    let isSubscribed = true;
+
+    async function fetchHeatmap() {
+      try {
+        setLoadingHeatmap(true);
+        const url = `/api/heatmap/history?eventId=${selectedEventId}&timestamp=${timeISO}`;
+        console.log('[HEATMAP FRONTEND] Fetching from URL:', url);
+        const res = await authFetch(url);
+        console.log('[HEATMAP FRONTEND] Response Status:', res.status, res.statusText);
+        if (!res.ok) throw new Error(`Failed to fetch heatmap data (status ${res.status}).`);
+        const json = await res.json();
+        console.log('[HEATMAP FRONTEND] Response JSON success:', json.success, 'data:', json.data);
+        if (json.success && isSubscribed) {
+          setHeatmapData(json.data);
+        }
+      } catch (err) {
+        console.error('[HEATMAP FRONTEND] Error in fetchHeatmap:', err);
+      } finally {
+        if (isSubscribed) setLoadingHeatmap(false);
+      }
+    }
+
+    fetchHeatmap();
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [selectedEventId, sliderVal, events]);
+
+  // Draw heatmap to canvas
+  useEffect(() => {
+    console.log('[HEATMAP FRONTEND] drawHeatmap triggered. HeatmapData:', heatmapData);
+    if (!canvasRef.current) {
+      console.log('[HEATMAP FRONTEND] Canvas ref is null, skipping draw.');
+      return;
+    }
+    
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, width, height);
+
+    // Draw blueprint bg
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(0, 0, width, height);
+
+    // Grid lines
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.lineWidth = 1;
+    const gridSize = 40;
+    for (let x = 0; x < width; x += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, height);
+      ctx.stroke();
+    }
+    for (let y = 0; y < height; y += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(width, y);
+      ctx.stroke();
+    }
+
+
+    if (!heatmapData || !heatmapData.features || heatmapData.features.length === 0) {
+      console.log('[HEATMAP FRONTEND] No features present in heatmapData. Rendering placeholder text.');
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.font = '13px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('No crowd activity recorded at this time', width / 2, height / 2);
+      return;
+    }
+
+    console.log('[HEATMAP FRONTEND] Rendering features count:', heatmapData.features.length);
+
+    // Colombo location coordinates projection bounds
+    const minLat = 6.9215;
+    const maxLat = 6.9325;
+    const minLon = 79.8555;
+    const maxLon = 79.8665;
+
+    heatmapData.features.forEach((feature, fIdx) => {
+      if (feature.geometry && feature.geometry.type === 'Polygon') {
+        const ring = feature.geometry.coordinates[0];
+        if (!ring || ring.length === 0) {
+          console.log(`[HEATMAP FRONTEND] Feature index ${fIdx} has empty polygon coordinates ring.`);
+          return;
+        }
+
+        const density = feature.properties.density;
+        let color = 'rgba(34, 197, 94, 0.45)'; // Green
+        let strokeColor = '#22c55e';
+        if (density === 'Red') {
+          color = 'rgba(239, 68, 68, 0.55)'; // Red
+          strokeColor = '#ef4444';
+        } else if (density === 'Yellow') {
+          color = 'rgba(234, 179, 8, 0.5)'; // Yellow
+          strokeColor = '#eab308';
+        }
+
+        ctx.beginPath();
+        const projectedCoords = [];
+        ring.forEach((coord, idx) => {
+          const lon = coord[0];
+          const lat = coord[1];
+          const x = ((lon - minLon) / (maxLon - minLon)) * width;
+          const y = (1 - (lat - minLat) / (maxLat - minLat)) * height;
+          projectedCoords.push({ lon, lat, x, y });
+          if (idx === 0) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
+        });
+        console.log(`[HEATMAP FRONTEND] Feature ${fIdx} (${density}): Projected coordinates:`, projectedCoords);
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      } else {
+        console.log(`[HEATMAP FRONTEND] Feature index ${fIdx} does not contain valid Polygon geometry:`, feature.geometry);
+      }
+    });
+  }, [heatmapData]);
 
   // Fetch events list on mount
   useEffect(() => {
@@ -358,6 +550,116 @@ export default function AnalyticsView() {
               ) : null}
               
               <canvas ref={chartRef} className="w-full h-full" />
+            </div>
+          </div>
+
+          {/* ── Historical Crowd Heatmap Replay (US-602) ─────────────────── */}
+          <div className="bg-white dark:bg-zinc-900/40 border border-slate-200/80 dark:border-zinc-800/80 rounded-2xl p-6 shadow-sm flex flex-col gap-6 relative overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-zinc-800 pb-4">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <TrendingUp size={16} className="text-indigo-500" />
+                  Historical Crowd Heatmap Replay
+                </h3>
+                <p className="text-slate-400 dark:text-zinc-500 text-[10px] mt-0.5">
+                  Replay crowd density trends dynamically across the event timeline
+                </p>
+              </div>
+
+              {/* Playback Indicators */}
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 dark:bg-zinc-800/50 rounded-xl text-xs font-bold text-slate-700 dark:text-zinc-350">
+                  <Clock size={14} className="text-indigo-500" />
+                  <span>Time: {formatTime(sliderVal)}</span>
+                </div>
+                {loadingHeatmap && (
+                  <span className="flex items-center gap-1 text-[10px] text-indigo-500 font-semibold animate-pulse">
+                    <Loader2 size={12} className="animate-spin" />
+                    Syncing...
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Canvas Area */}
+            <div className="relative w-full overflow-hidden rounded-xl border border-slate-200 dark:border-zinc-800 bg-[#0f172a] aspect-video sm:aspect-auto sm:h-[450px] flex items-center justify-center">
+              <canvas 
+                ref={canvasRef} 
+                width={800} 
+                height={450} 
+                className="max-w-full max-h-full object-contain"
+              />
+            </div>
+
+            {/* Playback Controls & Slider */}
+            <div className="bg-slate-50 dark:bg-zinc-900/80 border border-slate-200/50 dark:border-zinc-800/50 rounded-2xl p-4 flex flex-col gap-4">
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                {/* Play/Pause Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsPlaying(!isPlaying)}
+                  className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-extrabold shadow-sm transition-all duration-200 cursor-pointer ${
+                    isPlaying 
+                      ? 'bg-rose-500 hover:bg-rose-600 text-white' 
+                      : 'bg-indigo-650 hover:bg-indigo-700 text-white'
+                  }`}
+                >
+                  {isPlaying ? <Pause size={14} /> : <Play size={14} />}
+                  <span>{isPlaying ? 'Pause' : 'Play Replay'}</span>
+                </button>
+
+                {/* Reset Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPlaying(false);
+                    setSliderVal(0); // Reset to 12:00 AM
+                  }}
+                  className="flex items-center justify-center p-2.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-250 cursor-pointer shadow-xs transition-colors"
+                  title="Reset to 8:00 AM"
+                >
+                  <RotateCcw size={14} />
+                </button>
+
+                {/* Playback Speed Selector */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500">Speed:</span>
+                  {[2000, 1000, 500].map((speed, idx) => (
+                    <button
+                      key={speed}
+                      type="button"
+                      onClick={() => setPlaybackSpeed(speed)}
+                      className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                        playbackSpeed === speed
+                          ? 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30'
+                          : 'border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-slate-500 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800'
+                      }`}
+                    >
+                      {idx + 1}x
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Slider Input */}
+              <div className="space-y-1.5">
+                <input 
+                  type="range"
+                  min={0} // 12:00 AM
+                  max={1439} // 11:59 PM
+                  step={15}
+                  value={sliderVal}
+                  onChange={(e) => setSliderVal(parseInt(e.target.value))}
+                  className="w-full h-2 bg-slate-200 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                />
+                <div className="flex justify-between text-[9px] font-extrabold text-slate-400 dark:text-zinc-500">
+                  <span>12:00 AM</span>
+                  <span>6:00 AM</span>
+                  <span>12:00 PM</span>
+                  <span>6:00 PM</span>
+                  <span>11:59 PM</span>
+                </div>
+              </div>
             </div>
           </div>
         </>
