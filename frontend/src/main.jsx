@@ -5,6 +5,19 @@ import { GoogleOAuthProvider } from '@react-oauth/google'
 import './index.css'
 import AppRouter from './AppRouter.jsx'
 
+// Intercept global fetch to dynamically prepend backend URL in production
+if (import.meta.env.VITE_API_URL) {
+  const originalFetch = window.fetch;
+  window.fetch = async (input, init) => {
+    let url = input;
+    if (typeof input === 'string' && input.startsWith('/api')) {
+      url = `${import.meta.env.VITE_API_URL}${input}`;
+    }
+    return originalFetch(url, init);
+  };
+}
+
+
 import { ThemeProvider } from './context/ThemeContext.jsx'
 import { NotificationProvider } from './context/NotificationContext.jsx'
 
