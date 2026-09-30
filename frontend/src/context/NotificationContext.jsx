@@ -68,11 +68,11 @@ export function NotificationProvider({ children }) {
       const currentToken = localStorage.getItem('token');
       if (!currentToken) return;
 
-      // In development, bind to port 5050 (backend). In production, use VITE_WS_URL or same host.
+      // In development, bind to port 5000 (backend). In production, use VITE_WS_URL or same host.
       const wsUrl = import.meta.env.VITE_WS_URL
         ? `${import.meta.env.VITE_WS_URL}/?token=${currentToken}`
         : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-          ? `ws://${window.location.hostname}:5050/?token=${currentToken}`
+          ? `ws://${window.location.hostname}:5000/?token=${currentToken}`
           : `${wsProtocol}//${window.location.host}/ws?token=${currentToken}`);
 
 

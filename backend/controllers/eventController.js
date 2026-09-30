@@ -143,6 +143,8 @@ export const updateEvent = async (req, res) => {
 
 import Ticket from '../models/Ticket.js';
 import User from '../models/User.js';
+import Wallet from '../models/Wallet.js';
+import WalletLedger from '../models/WalletLedger.js';
 
 // POST /api/events/:id/purchase
 export const purchaseTicket = async (req, res) => {
@@ -154,17 +156,39 @@ export const purchaseTicket = async (req, res) => {
       return res.status(400).json({ success: false, message: 'All purchase fields are required.' });
     }
 
+    const numPrice = Number(price);
+    if (isNaN(numPrice) || numPrice <= 0) {
+      return res.status(400).json({ success: false, message: 'Invalid ticket price.' });
+    }
+
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found.' });
     }
 
-    if (user.walletBalance < price) {
-      return res.status(400).json({ success: false, message: 'Insufficient wallet balance.' });
+    // Connect to user's real digital wallet
+    let wallet = await Wallet.findOne({ user: userId });
+    if (!wallet) {
+      wallet = await Wallet.create({ user: userId });
     }
 
-    // Deduct balance
-    user.walletBalance -= price;
+    if (wallet.status !== 'Active') {
+      return res.status(400).json({ success: false, message: `Wallet is currently ${wallet.status}. Payment cannot proceed.` });
+    }
+
+    const currentBalance = parseFloat(wallet.balance.toString());
+    if (currentBalance < numPrice) {
+      return res.status(400).json({ success: false, message: 'Insufficient wallet balance. Please top up your wallet.' });
+    }
+
+    const newBalance = currentBalance - numPrice;
+
+    // Deduct from real wallet
+    wallet.balance = mongoose.Types.Decimal128.fromString(newBalance.toFixed(2));
+    await wallet.save();
+
+    // Also sync user.walletBalance for legacy compatibility
+    user.walletBalance = newBalance;
     await user.save();
 
     // Create ticket
@@ -174,12 +198,29 @@ export const purchaseTicket = async (req, res) => {
       event: eventId,
       tier,
       seat,
-      price,
+      price: numPrice,
       qrCodeData: qrPayload,
       status: 'Active'
     });
 
-    res.status(201).json({ success: true, ticket, walletBalance: user.walletBalance });
+    // Record ledger entry
+    await WalletLedger.create({
+      wallet: wallet._id,
+      transactionType: 'Debit',
+      amount: mongoose.Types.Decimal128.fromString(numPrice.toFixed(2)),
+      balanceBefore: mongoose.Types.Decimal128.fromString(currentBalance.toFixed(2)),
+      balanceAfter: mongoose.Types.Decimal128.fromString(newBalance.toFixed(2)),
+      description: `Ticket purchase: ${tier} Ticket (${seat})`,
+      referenceType: 'TicketPurchase',
+      referenceId: ticket._id.toString(),
+    });
+
+    res.status(201).json({ 
+      success: true, 
+      ticket, 
+      walletBalance: newBalance,
+      message: 'Ticket purchased successfully via Digital Wallet.' 
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

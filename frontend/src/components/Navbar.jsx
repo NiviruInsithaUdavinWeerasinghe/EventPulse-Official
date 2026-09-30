@@ -116,9 +116,9 @@ export default function Navbar({ currentPage, onNavigate }) {
               </Link>
               <Link
                 to="/customer/scavenger-hunt"
-                className="text-sm font-semibold text-indigo-400 hover:text-indigo-300 transition-colors duration-200 no-underline flex items-center gap-1"
+                className="text-sm font-semibold text-slate-400 hover:text-slate-50 transition-colors duration-200 no-underline"
               >
-                🎯 Scavenger Hunt
+                Scavenger Hunt
               </Link>
             </>
           )}
