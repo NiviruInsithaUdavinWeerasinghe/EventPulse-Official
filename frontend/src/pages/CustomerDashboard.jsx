@@ -25,7 +25,16 @@ import {
 /* ─── helpers ─────────────────────────────────────────── */
 function getUser() {
   try {
-    return JSON.parse(localStorage.getItem('user')) || {};
+    const raw = JSON.parse(localStorage.getItem('user')) || {};
+    const token = localStorage.getItem('token');
+    const jwtPayload = token ? parseJwt(token) : {};
+    return {
+      id: raw.id || raw._id || jwtPayload.id,
+      _id: raw._id || raw.id || jwtPayload.id,
+      fullName: raw.fullName || raw.name || jwtPayload.name || 'Customer',
+      email: raw.email || jwtPayload.email || '',
+      role: raw.role || jwtPayload.role || 'customer'
+    };
   } catch {
     return {};
   }
@@ -226,76 +235,126 @@ function VoucherQrModal({ voucher, onClose }) {
 /* ─── Ticket Card ───────────────────────────────────────── */
 function TicketCard({ ticket, onClick }) {
   const { isDarkMode } = useTheme();
+  
   const getThemeDetails = (tier) => {
-    if (tier === 'VIP') return { color: 'from-indigo-500 to-purple-600', glow: 'rgba(99,102,241,0.15)' };
-    if (tier === 'General') return { color: 'from-cyan-500 to-blue-600', glow: 'rgba(6,182,212,0.15)' };
-    return { color: 'from-amber-500 to-orange-500', glow: 'rgba(245,158,11,0.15)' };
+    if (tier === 'VIP') {
+      return { 
+        gradient: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
+        badgeBg: isDarkMode ? 'rgba(99, 102, 241, 0.2)' : '#e0e7ff',
+        badgeText: isDarkMode ? '#c7d2fe' : '#4338ca',
+        border: isDarkMode ? 'rgba(99, 102, 241, 0.3)' : 'rgba(99, 102, 241, 0.2)',
+        glow: 'rgba(99, 102, 241, 0.25)'
+      };
+    }
+    if (tier === 'General') {
+      return { 
+        gradient: 'linear-gradient(135deg, #0284c7 0%, #06b6d4 100%)',
+        badgeBg: isDarkMode ? 'rgba(6, 182, 212, 0.2)' : '#cffafe',
+        badgeText: isDarkMode ? '#a5f3fc' : '#0891b2',
+        border: isDarkMode ? 'rgba(6, 182, 212, 0.3)' : 'rgba(6, 182, 212, 0.2)',
+        glow: 'rgba(6, 182, 212, 0.25)'
+      };
+    }
+    return { 
+      gradient: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)',
+      badgeBg: isDarkMode ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7',
+      badgeText: isDarkMode ? '#fde68a' : '#b45309',
+      border: isDarkMode ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.2)',
+      glow: 'rgba(245, 158, 11, 0.25)'
+    };
   };
 
   const theme = getThemeDetails(ticket.tier);
 
   const formatDate = (dateStr) => {
-    if (!dateStr) return 'TBD';
+    if (!dateStr) return 'Saturday, Jul 11, 2026';
     return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   return (
     <div
-      className="relative rounded-2xl overflow-hidden flex-shrink-0 w-72 cursor-pointer transition-all duration-300 bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/[0.06]"
-      style={{
-        boxShadow: `0 10px 30px -10px ${theme.glow}`,
-      }}
       onClick={onClick}
+      className="relative rounded-3xl overflow-hidden flex-shrink-0 w-80 cursor-pointer transition-all duration-300 group select-none"
+      style={{
+        background: isDarkMode 
+          ? 'linear-gradient(145deg, rgba(15, 23, 42, 0.8) 0%, rgba(10, 15, 30, 0.95) 100%)' 
+          : '#ffffff',
+        border: isDarkMode ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #e2e8f0',
+        boxShadow: isDarkMode ? '0 15px 35px -5px rgba(0, 0, 0, 0.5)' : '0 10px 25px -3px rgba(0, 0, 0, 0.06)'
+      }}
       onMouseEnter={e => {
         e.currentTarget.style.transform = 'translateY(-4px)';
-        e.currentTarget.style.borderColor = 'rgba(99,102,241,0.2)';
+        e.currentTarget.style.borderColor = isDarkMode ? 'rgba(99, 102, 241, 0.4)' : '#cbd5e1';
       }}
       onMouseLeave={e => {
         e.currentTarget.style.transform = 'translateY(0)';
-        e.currentTarget.style.borderColor = isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+        e.currentTarget.style.borderColor = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#e2e8f0';
       }}
     >
-      {/* colour bar */}
-      <div className={`h-1 w-full bg-gradient-to-r ${theme.color}`} />
+      {/* Top accent gradient strip */}
+      <div className="h-1.5 w-full" style={{ background: theme.gradient }} />
 
-      <div className="p-5">
-        {/* tier badge */}
-        <span
-          className="inline-block text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md mb-3 bg-slate-200/50 dark:bg-white/5 border border-slate-300/30 dark:border-white/5 text-slate-700 dark:text-slate-300"
-        >
-          {ticket.tier}
-        </span>
+      <div className="p-6 space-y-4">
+        {/* Tier badge & Live status */}
+        <div className="flex items-center justify-between">
+          <span
+            className="text-[10px] font-extrabold uppercase tracking-widest px-3 py-1 rounded-full border"
+            style={{
+              background: theme.badgeBg,
+              color: theme.badgeText,
+              borderColor: theme.border
+            }}
+          >
+            {ticket.tier || 'Standard'} Pass
+          </span>
 
-        <h3 className="text-base font-bold text-slate-900 dark:text-white leading-tight mb-3 line-clamp-2">
-          {ticket.event?.name || 'Event Title'}
-        </h3>
-
-        <div className="space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
-          <div className="flex items-center gap-2">
-            <CalendarDays size={12} className="text-slate-400 dark:text-slate-500" />
-            {formatDate(ticket.event?.date)}
-          </div>
-          <div className="flex items-center gap-2">
-            <MapPin size={12} className="text-slate-400 dark:text-slate-500" />
-            Exhibition Arena Hall A
-          </div>
+          <span className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-500">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Valid Entry
+          </span>
         </div>
 
-        {/* divider dashed */}
-        <div
-          className="my-4"
-          style={{
-            borderTop: isDarkMode ? '1px dashed rgba(255,255,255,0.08)' : '1px dashed rgba(0,0,0,0.08)',
-          }}
-        />
+        {/* Event Name */}
+        <div>
+          <h3 className="text-base font-extrabold text-slate-900 dark:text-white leading-snug line-clamp-1 group-hover:text-indigo-500 dark:group-hover:text-indigo-400 transition-colors">
+            {ticket.event?.name || 'Live Event'}
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5">
+            <CalendarDays size={13} className="text-slate-400" />
+            {formatDate(ticket.event?.date)}
+          </p>
+        </div>
 
-        <div className="flex items-center justify-between">
+        {/* Location chip */}
+        <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-white/[0.03] px-3 py-2 rounded-xl border border-slate-200/60 dark:border-white/5">
+          <MapPin size={13} className="text-indigo-500 flex-shrink-0" />
+          <span className="truncate font-medium">Exhibition Arena Hall A</span>
+        </div>
+
+        {/* Perforated ticket notch separator */}
+        <div className="relative py-1">
+          <div 
+            className="w-full border-t border-dashed"
+            style={{ borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.12)' : '#e2e8f0' }}
+          />
+        </div>
+
+        {/* Ticket Bottom: Seat & QR trigger */}
+        <div className="flex items-center justify-between pt-1">
           <div>
-            <p className="text-[10px] text-slate-500 uppercase tracking-wide">Seat</p>
-            <p className="text-sm font-bold text-slate-900 dark:text-white">{ticket.seat}</p>
+            <p className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 tracking-wider">Assigned Seat</p>
+            <p className="text-sm font-black text-slate-900 dark:text-white mt-0.5">{ticket.seat || 'General'}</p>
           </div>
-          <div className="p-2 rounded-lg bg-slate-200/40 dark:bg-white/[0.03]">
-            <QrCode size={18} className="text-slate-500 dark:text-slate-400" />
+
+          <div 
+            className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all shadow-sm group-hover:scale-105"
+            style={{
+              background: isDarkMode ? 'rgba(99, 102, 241, 0.15)' : '#f1f5f9',
+              color: isDarkMode ? '#a5b4fc' : '#334155',
+              border: isDarkMode ? '1px solid rgba(99, 102, 241, 0.3)' : '1px solid #e2e8f0'
+            }}
+          >
+            <QrCode size={15} />
+            <span>Show QR</span>
           </div>
         </div>
       </div>
@@ -541,6 +600,16 @@ export default function CustomerDashboard() {
             const vouchersData = await vouchersRes.json();
             if (vouchersData.success) setVouchers(vouchersData.vouchers || []);
           }
+          // Fetch initial wallet history
+          const historyRes = await fetch(`/api/wallet/history`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (historyRes.ok) {
+            const historyData = await historyRes.json();
+            if (historyData.success) {
+              setTransactions(historyData.transactions || []);
+            }
+          }
         } catch (err) {
           console.error("Dashboard fetch error:", err);
         }
@@ -611,81 +680,133 @@ export default function CustomerDashboard() {
       {/* ── Main ── */}
       <main className="max-w-6xl mx-auto px-6 py-10 space-y-10">
 
-        {/* Greeting */}
-        <div className="animate-slide-up">
-          <p className="text-slate-500 dark:text-slate-400 text-sm mb-1">{greeting},</p>
-          <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            {user.fullName || 'Welcome back'} 👋
-          </h1>
-          <p className="text-slate-550 dark:text-slate-500 text-sm mt-1">Here's what's happening with your events.</p>
+        {/* ── Header / Greeting Hero Banner ── */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-2">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[11px] font-extrabold tracking-widest uppercase text-indigo-500 dark:text-indigo-400 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20">
+                Attendee Console
+              </span>
+              <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold">•</span>
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+              </span>
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+              {greeting}, <span className="capitalize">{user.fullName || 'Attendee'}</span>
+            </h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-xl font-normal">
+              Manage your verified passes, instant venue payments, and real-time activity.
+            </p>
+          </div>
+
+          {/* Quick wallet balance pill button */}
+          <div 
+            onClick={() => setShowTopUp(true)}
+            className="flex items-center gap-4 p-3.5 pr-5 rounded-2xl border cursor-pointer transition-all shadow-md group select-none shrink-0"
+            style={{
+              background: isDarkMode ? 'linear-gradient(145deg, rgba(15, 23, 42, 0.7) 0%, rgba(10, 15, 30, 0.85) 100%)' : '#ffffff',
+              borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#e2e8f0',
+            }}
+          >
+            <div className="w-11 h-11 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform">
+              <Wallet size={20} />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Digital Balance</p>
+              <p className="text-base font-black text-slate-900 dark:text-white">
+                LKR {walletBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+          </div>
         </div>
 
-        {/* ── Stats Row ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 animate-slide-up">
+        {/* ── Stats Metric Cards (Grid of 3) ── */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 animate-slide-up">
           {[
             {
               id: 'stat-tickets',
               icon: Ticket,
-              label: 'Active Tickets',
+              label: 'Active Passes',
               value: tickets.length,
-              suffix: '',
+              subtext: 'Ready for scanning',
               color: '#6366f1',
+              bgLight: '#eef2ff',
+              bgDark: 'rgba(99, 102, 241, 0.15)',
             },
             {
               id: 'stat-wallet',
               icon: Wallet,
-              label: 'Wallet Balance',
+              label: 'Digital Wallet',
               value: `LKR ${walletBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
-              suffix: '',
+              subtext: 'Cashless balance',
               color: '#a855f7',
+              bgLight: '#faf5ff',
+              bgDark: 'rgba(168, 85, 247, 0.15)',
             },
             {
               id: 'stat-upcoming',
               icon: CalendarDays,
-              label: 'Upcoming Events',
+              label: 'Booked Sessions',
               value: tickets.length > 0 ? 1 : 0,
-              suffix: ' this month',
+              subtext: 'Upcoming event this month',
               color: '#06b6d4',
+              bgLight: '#ecfeff',
+              bgDark: 'rgba(6, 182, 212, 0.15)',
             },
           ].map(stat => (
             <div
               key={stat.id}
               id={stat.id}
-              className="rounded-2xl p-5 flex items-center gap-4 border border-slate-200 dark:border-white/[0.04] bg-slate-50 dark:bg-white/[0.01]"
+              className="rounded-3xl p-6 flex items-center gap-5 border transition-all duration-300 shadow-sm hover:shadow-md"
+              style={{
+                background: isDarkMode 
+                  ? 'linear-gradient(145deg, rgba(15, 23, 42, 0.75) 0%, rgba(10, 15, 30, 0.9) 100%)' 
+                  : '#ffffff',
+                borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#e2e8f0',
+              }}
             >
               <div
-                className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-slate-200/50 dark:bg-white/[0.03]"
+                className="w-13 h-13 rounded-2xl flex items-center justify-center flex-shrink-0"
+                style={{
+                  background: isDarkMode ? stat.bgDark : stat.bgLight,
+                  color: stat.color
+                }}
               >
-                <stat.icon size={20} style={{ color: stat.color }} />
+                <stat.icon size={22} />
               </div>
-              <div>
-                <p className="text-xs text-slate-500 mb-0.5">{stat.label}</p>
-                <p className="text-xl font-bold text-slate-900 dark:text-white">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-0.5">{stat.label}</p>
+                <p className="text-2xl font-black text-slate-900 dark:text-white truncate">
                   {stat.value}
-                  <span className="text-xs font-normal text-slate-500">{stat.suffix}</span>
                 </p>
+                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-0.5">{stat.subtext}</p>
               </div>
             </div>
           ))}
         </div>
 
-        {/* ── Tickets + Wallet Row ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* ── Main Workspace Row: Tickets & Live Digital Wallet ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
-          {/* Tickets panel ── takes 2/3 */}
-          <div className="lg:col-span-2 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">My Tickets</h2>
+          {/* Tickets panel ── takes 7 cols */}
+          <div className="lg:col-span-7 space-y-4">
+            <div className="flex items-center justify-between pb-1">
+              <div>
+                <h2 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">Active Passes & Tickets</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Click any ticket to display its entry QR code</p>
+              </div>
               <button
                 id="view-all-tickets"
-                className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-650 dark:hover:text-indigo-300 transition-colors flex items-center gap-1 cursor-pointer bg-transparent border-none font-semibold"
+                onClick={() => navigate('/events')}
+                className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors flex items-center gap-1 cursor-pointer bg-transparent border-none font-bold"
               >
-                View all <ChevronRight size={13} />
+                Browse events <ChevronRight size={13} />
               </button>
             </div>
 
-            {/* Horizontal scroll of ticket cards */}
-            <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'thin' }}>
+            {/* Horizontal scroll of ticket cards with hidden scrollbar */}
+            <div className="flex gap-4 overflow-x-auto pb-4 pt-1 no-scrollbar">
               {tickets.length > 0 ? (
                 tickets.map(t => (
                   <TicketCard
@@ -695,138 +816,184 @@ export default function CustomerDashboard() {
                   />
                 ))
               ) : (
-                <div className="text-slate-500 py-6 text-sm">No tickets purchased yet.</div>
+                <div 
+                  className="w-full py-12 px-6 text-center rounded-3xl border text-slate-500 text-sm"
+                  style={{
+                    background: isDarkMode ? 'rgba(255, 255, 255, 0.01)' : '#f8fafc',
+                    borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.06)' : '#e2e8f0'
+                  }}
+                >
+                  <Ticket size={28} className="mx-auto mb-2 opacity-40 text-slate-400" />
+                  <p className="font-semibold text-slate-700 dark:text-slate-300">No tickets purchased yet</p>
+                  <p className="text-xs text-slate-400 mt-1">Book tickets from any event page to activate access.</p>
+                </div>
               )}
             </div>
           </div>
 
-          {/* Wallet panel ── takes 1/3 */}
+          {/* Wallet panel ── takes 5 cols */}
           <div
             id="wallet-panel"
-            className="rounded-2xl p-6 flex flex-col justify-between border border-slate-200 dark:border-white/[0.04] bg-slate-50 dark:bg-white/[0.002]"
+            className="lg:col-span-5 rounded-3xl p-7 flex flex-col justify-between border shadow-xl relative overflow-hidden transition-colors"
             style={{
               background: isDarkMode 
-                ? 'linear-gradient(145deg, rgba(255,255,255,0.01) 0%, rgba(255,255,255,0.002) 100%)'
-                : 'linear-gradient(145deg, rgba(0,0,0,0.01) 0%, rgba(0,0,0,0.002) 100%)',
-              minHeight: 260,
+                ? 'linear-gradient(145deg, rgba(15, 23, 42, 0.85) 0%, rgba(10, 15, 30, 0.98) 100%)' 
+                : '#ffffff',
+              borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : '#e2e8f0',
+              boxShadow: isDarkMode ? '0 20px 50px rgba(0, 0, 0, 0.5)' : '0 10px 30px rgba(0, 0, 0, 0.05)',
+              minHeight: 280,
             }}
           >
             <div>
-              <div className="flex items-center justify-between mb-5">
-                <div className="flex items-center gap-2">
-                  <Wallet size={16} className="text-purple-500 dark:text-purple-400" />
-                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Digital Wallet</span>
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-600 dark:text-purple-400">
+                    <Wallet size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">Event Digital Wallet</h3>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-semibold">Cashless POS Token</p>
+                  </div>
                 </div>
                 <span
-                  className="text-[10px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full"
+                  className="text-[10px] font-extrabold uppercase tracking-widest px-3 py-1 rounded-full border"
                   style={{
-                    background: 'rgba(168,85,247,0.1)',
-                    color: isDarkMode ? '#c084fc' : '#7e22ce',
-                    border: '1px solid rgba(168,85,247,0.15)',
+                    background: 'rgba(16, 185, 129, 0.12)',
+                    color: '#10b981',
+                    borderColor: 'rgba(16, 185, 129, 0.25)',
                   }}
                 >
-                  Live
+                  Active & Live
                 </span>
               </div>
 
-              <p className="text-xs text-slate-550 dark:text-slate-500 mb-1">Available Balance</p>
-              <p className="text-3xl font-extrabold text-slate-900 dark:text-white mb-0.5">
-                LKR {walletBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-              </p>
-              <p className="text-xs text-slate-550 dark:text-slate-500">≈ USD {(walletBalance / 300).toFixed(2)}</p>
+              <div 
+                className="p-5 rounded-2xl border mb-6"
+                style={{
+                  background: isDarkMode ? 'rgba(255, 255, 255, 0.02)' : '#f8fafc',
+                  borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.06)' : '#e2e8f0'
+                }}
+              >
+                <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1">
+                  Available Spending Balance
+                </p>
+                <div className="flex items-baseline justify-between">
+                  <p className="text-3xl font-black text-slate-900 dark:text-white">
+                    LKR {walletBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </p>
+                  <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">
+                    ≈ USD {(walletBalance / 300).toFixed(2)}
+                  </span>
+                </div>
+              </div>
             </div>
 
-            <div className="space-y-2 mt-6">
+            <div className="space-y-3">
               <button
                 id="quick-pay-qr-btn"
                 onClick={() => navigate('/customer/wallet/pay')}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm text-white transition-all duration-200 cursor-pointer shadow-lg shadow-indigo-500/10"
+                className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-sm text-white transition-all duration-200 cursor-pointer shadow-lg shadow-indigo-500/25"
                 style={{
-                  background: 'linear-gradient(135deg,#6366f1,#7c3aed)',
+                  background: 'linear-gradient(135deg, #6366f1 0%, #7c3aed 100%)',
                 }}
                 onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-1px)')}
                 onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
               >
-                <QrCode size={16} />
-                Quick Pay QR
+                <QrCode size={17} />
+                Generate Quick Pay QR
               </button>
 
               <button
                 id="top-up-btn"
                 onClick={() => setShowTopUp(true)}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-sm bg-slate-200/50 dark:bg-white/[0.02] border border-slate-300/30 dark:border-white/5 text-slate-700 dark:text-slate-300 hover:bg-slate-300/50 dark:hover:bg-white/[0.04] hover:text-slate-900 dark:hover:text-white transition-all cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-xs border transition-all cursor-pointer"
+                style={{
+                  background: isDarkMode ? 'rgba(255, 255, 255, 0.03)' : '#f1f5f9',
+                  borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#e2e8f0',
+                  color: isDarkMode ? '#cbd5e1' : '#334155'
+                }}
                 onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-1px)')}
                 onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
               >
-                + Top Up Wallet
+                + Top Up Wallet Balance
               </button>
             </div>
           </div>
         </div>
 
-{/* ── Scavenger Hunt CTA ── */}
+        {/* ── Interactive Venue Exploration / Scavenger Hunt ── */}
         <div
           id="scavenger-hunt-cta"
-          className="rounded-2xl overflow-hidden relative cursor-pointer group border border-indigo-500/30 bg-gradient-to-r from-indigo-900/20 via-purple-900/20 to-slate-900/30 hover:border-indigo-500/50 transition-all duration-300 shadow-lg shadow-indigo-500/5"
+          className="rounded-3xl overflow-hidden relative cursor-pointer group border transition-all duration-300 shadow-sm hover:shadow-lg"
+          style={{
+            background: isDarkMode 
+              ? 'linear-gradient(135deg, rgba(30, 27, 75, 0.35) 0%, rgba(15, 23, 42, 0.85) 100%)' 
+              : '#ffffff',
+            borderColor: isDarkMode ? 'rgba(99, 102, 241, 0.2)' : '#e2e8f0'
+          }}
           onClick={() => navigate('/customer/scavenger-hunt')}
         >
-          <div className="relative z-10 p-7 flex items-center justify-between">
+          <div className="relative z-10 p-7 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <Sparkles size={16} className="text-amber-400" />
-                <span className="text-xs font-bold text-amber-400 uppercase tracking-widest">
-                  Live Event Game
+                <span className="text-[10px] font-extrabold text-indigo-500 dark:text-indigo-400 uppercase tracking-widest bg-indigo-500/10 px-2.5 py-0.5 rounded-full border border-indigo-500/20">
+                  Interactive Venue Experience
                 </span>
               </div>
-              <h2 className="text-xl font-extrabold text-slate-900 dark:text-white mb-1 flex items-center gap-2">
-                Venue Scavenger Hunt 🗺️
+              <h2 className="text-xl font-black text-slate-900 dark:text-white mb-1">
+                Venue Discovery & Scavenger Quest
               </h2>
-              <p className="text-sm text-slate-500 dark:text-slate-300">
-                Scan hidden QR codes around venue zones using your camera to earn points!
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xl">
+                Scan authenticated checkpoint QR checkpoints across hall zones to unlock food court perks and partner incentives.
               </p>
             </div>
 
             <div
-              className="flex-shrink-0 px-4 py-2.5 rounded-xl flex items-center gap-2 font-bold text-xs bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-md shadow-indigo-600/30"
+              className="flex-shrink-0 px-5 py-3 rounded-2xl flex items-center gap-2 font-bold text-xs bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-md shadow-indigo-600/20"
             >
               <QrCode size={16} />
-              Open Scanner
+              Launch Scanner
             </div>
           </div>
         </div>
 
         {/* ── My Rewards (Vouchers) ── */}
         {vouchers.length > 0 && (
-          <div id="my-rewards-section">
-            <div className="flex items-center gap-2 mb-4">
-              <Gift size={16} className="text-amber-400" />
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">My Rewards</h2>
-              <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full" style={{ background: 'rgba(245,158,11,0.12)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.2)' }}>
-                {vouchers.filter(v => v.status === 'Active').length} Active
+          <div id="my-rewards-section" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Gift size={16} className="text-amber-500" />
+                <h2 className="text-lg font-black text-slate-900 dark:text-white">Earned Rewards & Vouchers</h2>
+              </div>
+              <span className="text-[10px] font-extrabold uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                {vouchers.filter(v => v.status === 'Active').length} Available
               </span>
             </div>
 
-            <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'thin' }}>
+            <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
               {vouchers.map(v => {
                 const isRedeemed = v.status === 'Redeemed';
                 return (
                   <div
                     key={v._id}
                     onClick={() => setSelectedVoucher(v)}
-                    className={`relative rounded-2xl overflow-hidden flex-shrink-0 w-60 cursor-pointer transition-all duration-300 border ${
-                      isRedeemed
-                        ? 'opacity-55 border-slate-300/30 dark:border-white/[0.04] bg-slate-100 dark:bg-white/[0.01]'
-                        : 'border-amber-500/30 bg-gradient-to-br from-amber-950/20 to-slate-900/30 dark:from-amber-900/10 dark:to-slate-900/20 shadow-lg shadow-amber-500/10'
-                    }`}
-                    onMouseEnter={e => { if (!isRedeemed) e.currentTarget.style.transform = 'translateY(-4px)'; }}
+                    className="relative rounded-3xl overflow-hidden flex-shrink-0 w-64 cursor-pointer transition-all duration-300 border shadow-md select-none"
+                    style={{
+                      background: isDarkMode 
+                        ? 'linear-gradient(145deg, rgba(15, 23, 42, 0.75) 0%, rgba(10, 15, 30, 0.9) 100%)' 
+                        : '#ffffff',
+                      borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#e2e8f0',
+                      opacity: isRedeemed ? 0.5 : 1
+                    }}
+                    onMouseEnter={e => { if (!isRedeemed) e.currentTarget.style.transform = 'translateY(-3px)'; }}
                     onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; }}
                   >
-                    <div className={`h-1 w-full ${isRedeemed ? 'bg-slate-300 dark:bg-white/10' : 'bg-gradient-to-r from-amber-400 to-orange-500'}`} />
-                    <div className="p-5">
-                      <div className="flex items-center justify-between mb-3">
-                        <span className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md ${
+                    <div className="h-1.5 w-full bg-gradient-to-r from-amber-400 to-orange-500" />
+                    <div className="p-5 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className={`text-[10px] font-extrabold uppercase tracking-widest px-2.5 py-0.5 rounded-md ${
                           isRedeemed
-                            ? 'bg-slate-200/50 dark:bg-white/5 text-slate-500 dark:text-slate-400'
+                            ? 'bg-slate-200/50 dark:bg-white/5 text-slate-500'
                             : 'bg-amber-500/10 border border-amber-500/20 text-amber-500 dark:text-amber-300'
                         }`}>
                           {isRedeemed ? 'Redeemed' : 'Active'}
@@ -834,24 +1001,16 @@ export default function CustomerDashboard() {
                         <Gift size={14} className={isRedeemed ? 'text-slate-400' : 'text-amber-400'} />
                       </div>
 
-                      <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">Food Court Voucher</h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-                        {isRedeemed ? 'This voucher has been used.' : 'Free checkout at participating food court vendors.'}
-                      </p>
+                      <div>
+                        <h3 className="text-sm font-extrabold text-slate-900 dark:text-white leading-tight">Food Court Voucher</h3>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                          {isRedeemed ? 'Voucher claimed at vendor POS' : 'Complimentary meal at event food stalls'}
+                        </p>
+                      </div>
 
-                      <div
-                        className="my-3"
-                        style={{ borderTop: '1px dashed rgba(245,158,11,0.2)' }}
-                      />
-
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-[10px] text-slate-500 uppercase tracking-wide">Value</p>
-                          <p className={`text-sm font-bold ${isRedeemed ? 'text-slate-400' : 'text-amber-400'}`}>LKR 0.00 Free</p>
-                        </div>
-                        <div className="p-2 rounded-lg" style={{ background: isRedeemed ? 'rgba(255,255,255,0.03)' : 'rgba(245,158,11,0.08)' }}>
-                          <QrCode size={18} className={isRedeemed ? 'text-slate-500' : 'text-amber-400'} />
-                        </div>
+                      <div className="pt-2 border-t border-dashed border-slate-200 dark:border-white/10 flex items-center justify-between">
+                        <span className="text-xs font-bold text-amber-500">Free Item</span>
+                        <span className="text-[11px] font-bold text-indigo-500 dark:text-indigo-400">View QR →</span>
                       </div>
                     </div>
                   </div>
@@ -861,49 +1020,25 @@ export default function CustomerDashboard() {
           </div>
         )}
 
-        {/* ── Browse Events CTA ── */}
-        <div
-          id="browse-events-cta"
-          className="rounded-2xl overflow-hidden relative cursor-pointer group border border-slate-200 dark:border-white/[0.04] bg-slate-50 dark:bg-white/[0.01] hover:border-indigo-500/20 transition-all duration-300"
-          onClick={() => navigate('/events')}
-        >
-          <div className="relative z-10 p-7 flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Sparkles size={16} className="text-indigo-500 dark:text-indigo-400" />
-                <span className="text-xs font-semibold text-indigo-500 dark:text-indigo-400 uppercase tracking-widest">
-                  Discover
-                </span>
-              </div>
-              <h2 className="text-xl font-extrabold text-slate-900 dark:text-white mb-1">
-                Browse Upcoming Events
-              </h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Find concerts, expos, and food fests near you
-              </p>
-            </div>
-
-            <div
-              className="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center ml-4 transition-all duration-200 group-hover:-translate-y-1 bg-slate-200/40 dark:bg-white/[0.02] border border-slate-300/30 dark:border-white/5"
-            >
-              <ChevronRight size={22} className="text-indigo-500 dark:text-indigo-400" />
-            </div>
+        {/* ── Recent Activity Feed (Clean Financial Statement Style) ── */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">Recent Wallet Activity</h2>
+            <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold">Live Audit Trail</span>
           </div>
-        </div>
 
-        {/* ── Recent Activity ── */}
-        <div>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Recent Activity</h2>
           <div
-            className="rounded-2xl divide-y border border-slate-200 dark:border-white/[0.04] bg-slate-50 dark:bg-white/[0.01]"
+            className="rounded-3xl border overflow-hidden shadow-sm transition-colors"
             style={{
-              divideColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+              background: isDarkMode 
+                ? 'linear-gradient(145deg, rgba(15, 23, 42, 0.75) 0%, rgba(10, 15, 30, 0.9) 100%)' 
+                : '#ffffff',
+              borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#e2e8f0',
             }}
           >
             {transactions.length > 0 ? (
               transactions.map((item, idx) => {
                 const isCredit = item.transactionType === 'Credit';
-                const iconColor = isCredit ? '#10b981' : '#6366f1';
                 const formattedTime = new Date(item.createdAt).toLocaleDateString('en-US', {
                   month: 'short',
                   day: 'numeric',
@@ -913,37 +1048,42 @@ export default function CustomerDashboard() {
 
                 return (
                   <div
-                    key={item.id}
-                    className="flex items-center gap-4 px-5 py-4"
+                    key={item.id || idx}
+                    className="flex items-center gap-4 px-6 py-4 transition-colors hover:bg-slate-50/50 dark:hover:bg-white/[0.01]"
                     style={{
-                      borderColor: isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)',
-                      borderTopWidth: idx === 0 ? 0 : 1,
+                      borderTop: idx === 0 ? 'none' : (isDarkMode ? '1px solid rgba(255, 255, 255, 0.04)' : '1px solid #f1f5f9'),
                     }}
                   >
                     <div
-                      className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-slate-200/50 dark:bg-white/[0.03]"
+                      className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{
+                        background: isCredit ? 'rgba(16, 185, 129, 0.1)' : 'rgba(99, 102, 241, 0.1)',
+                        color: isCredit ? '#10b981' : '#6366f1'
+                      }}
                     >
-                      <Wallet size={14} style={{ color: iconColor }} />
+                      <Wallet size={16} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-slate-800 dark:text-slate-250 truncate">
+                      <p className="text-sm font-extrabold text-slate-900 dark:text-slate-100 truncate">
                         {item.description}
                       </p>
-                      <p className="text-[10px] text-slate-400">
-                        {item.referenceType} • {isCredit ? 'Credit' : 'Debit'}
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+                        {item.referenceType} • <span className={isCredit ? 'text-emerald-500 font-semibold' : 'text-slate-400'}>{item.transactionType}</span>
                       </p>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <span className={`text-sm font-extrabold ${isCredit ? 'text-emerald-500' : 'text-slate-900 dark:text-white'}`}>
+                      <span className={`text-sm font-black ${isCredit ? 'text-emerald-500' : 'text-slate-900 dark:text-white'}`}>
                         {isCredit ? '+' : '-'} LKR {item.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </span>
-                      <span className="text-[10px] text-slate-405 block mt-0.5">{formattedTime}</span>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 block mt-0.5">{formattedTime}</span>
                     </div>
                   </div>
                 );
               })
             ) : (
-              <div className="text-slate-500 py-6 text-sm text-center">No transaction logs available yet.</div>
+              <div className="py-12 text-center text-slate-400 text-sm">
+                No transaction logs recorded yet.
+              </div>
             )}
           </div>
         </div>

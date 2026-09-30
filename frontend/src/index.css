@@ -243,3 +243,12 @@
   animation: shrinkWidth linear forwards;
 }
 
+/* ── Hide scrollbar utility for clean modern horizontal feeds ── */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
