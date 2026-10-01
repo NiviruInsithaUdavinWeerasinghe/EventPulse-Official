@@ -199,6 +199,94 @@ router.post('/reset', protect, async (req, res) => {
 });
 
 /**
+ * GET /api/scavenger/admin/codes
+ * Organizer route: Fetch all codes with statistics
+ */
+router.get('/admin/codes', protect, async (req, res) => {
+  try {
+    const codes = await ScavengerCode.find().sort({ createdAt: -1 });
+    
+    // Aggregate scan counts per code
+    const stats = await ScannedCode.aggregate([
+      { $group: { _id: '$qr_string', totalScans: { $sum: 1 } } }
+    ]);
+    const scanMap = {};
+    stats.forEach(s => { scanMap[s._id] = s.totalScans; });
+
+    const enrichedCodes = codes.map(c => ({
+      ...c.toObject(),
+      totalScans: scanMap[c.code] || 0
+    }));
+
+    return res.status(200).json({
+      success: true,
+      codes: enrichedCodes
+    });
+  } catch (err) {
+    console.error('Error fetching admin scavenger codes:', err);
+    return res.status(500).json({ success: false, message: 'Server Error' });
+  }
+});
+
+/**
+ * POST /api/scavenger/admin/codes
+ * Organizer route: Create a new custom Scavenger Quest Code
+ */
+router.post('/admin/codes', protect, async (req, res) => {
+  try {
+    const { title, locationHint, code, points } = req.body;
+    if (!title || !title.trim()) {
+      return res.status(400).json({ success: false, message: 'Title is required.' });
+    }
+
+    // Auto-generate code if not explicitly given
+    const cleanCode = (code && code.trim()) 
+      ? code.trim().toUpperCase().replace(/\s+/g, '_')
+      : `HUNT_${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+
+    const existing = await ScavengerCode.findOne({ code: cleanCode });
+    if (existing) {
+      return res.status(400).json({ success: false, message: 'A quest with this code already exists.' });
+    }
+
+    const newCode = await ScavengerCode.create({
+      code: cleanCode,
+      title: title.trim(),
+      locationHint: locationHint ? locationHint.trim() : 'Explore venue area',
+      points: Number(points) || 1,
+      isActive: true
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Scavenger quest created successfully.',
+      code: newCode
+    });
+  } catch (err) {
+    console.error('Error creating admin scavenger code:', err);
+    return res.status(500).json({ success: false, message: 'Server Error' });
+  }
+});
+
+/**
+ * DELETE /api/scavenger/admin/codes/:id
+ * Organizer route: Delete or deactivate a scavenger code
+ */
+router.delete('/admin/codes/:id', protect, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await ScavengerCode.findByIdAndDelete(id);
+    return res.status(200).json({
+      success: true,
+      message: 'Scavenger quest code removed successfully.'
+    });
+  } catch (err) {
+    console.error('Error deleting scavenger code:', err);
+    return res.status(500).json({ success: false, message: 'Server Error' });
+  }
+});
+
+/**
  * GET /api/scavenger/vouchers
  * Returns active and redeemed digital vouchers for the authenticated attendee
  */

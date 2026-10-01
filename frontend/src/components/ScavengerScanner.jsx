@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import jsQR from 'jsqr';
-import { Camera, RefreshCw, AlertCircle, CheckCircle, Loader2, Sparkles, Send } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext.jsx';
+import { Camera, RefreshCw, AlertCircle, CheckCircle, Loader2, Sparkles, Send, Upload, Image as ImageIcon } from 'lucide-react';
 
-export default function ScavengerScanner({ onScanSuccess }) {
+export default function ScavengerScanner({ onScanSuccess, codes = [] }) {
+  const { isDarkMode } = useTheme();
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const fileInputRef = useRef(null);
   const animationFrameRef = useRef(null);
 
   // States: 'idle', 'scanning', 'processing', 'success', 'error'
@@ -13,15 +16,10 @@ export default function ScavengerScanner({ onScanSuccess }) {
   const [feedback, setFeedback] = useState(null); // { type: 'success'|'duplicate'|'invalid'|'error', title, message }
   const [simulatedCode, setSimulatedCode] = useState('');
 
-  // Sample preset codes for quick testing/simulation
-  const PRESET_TEST_CODES = [
-    'HUNT_ZONE_A_101',
-    'HUNT_VIP_LOUNGE_202',
-    'HUNT_STAGE_NORTH_303',
-    'HUNT_FOOD_COURT_404',
-    'HUNT_MAIN_HALL_505',
-    'INVALID_CODE_XYZ',
-  ];
+  // Use real codes from database passed from parent, with fallback
+  const activeCodesList = codes && codes.length > 0
+    ? codes.map(c => c.code)
+    : ['HUNT_ZONE_A_101', 'HUNT_VIP_LOUNGE_202', 'HUNT_STAGE_NORTH_303', 'HUNT_FOOD_COURT_404', 'HUNT_MAIN_HALL_505'];
 
   // Initialize camera stream
   const startCamera = async () => {
@@ -113,6 +111,49 @@ export default function ScavengerScanner({ onScanSuccess }) {
       console.warn('Frame scan tick error:', e);
     }
     animationFrameRef.current = requestAnimationFrame(tickScan);
+  };
+
+  // Decode QR code from uploaded image file
+  const handleImageUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset file input value so user can upload the same file again if desired
+    e.target.value = '';
+
+    setScanState('processing');
+    setFeedback(null);
+    freezeCameraFeed();
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = canvasRef.current || document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0, img.width, img.height);
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: 'attemptBoth',
+        });
+
+        if (code && code.data) {
+          handleParsedCode(code.data);
+        } else {
+          setScanState('error');
+          setFeedback({
+            type: 'invalid',
+            title: 'No QR Code Detected',
+            message: 'Could not detect a clear QR code in this image. Please upload a clear photo or screenshot.',
+          });
+        }
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
   };
 
   // Send parsed QR string to backend validation API (SUB-1 + SUB-2)
@@ -213,28 +254,70 @@ export default function ScavengerScanner({ onScanSuccess }) {
   }, []);
 
   return (
-    <div className="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-2xl space-y-6">
+    <div 
+      className="w-full rounded-3xl p-6 sm:p-8 backdrop-blur-xl border space-y-6 transition-all"
+      style={{
+        background: isDarkMode 
+          ? 'linear-gradient(145deg, rgba(15, 23, 42, 0.7) 0%, rgba(10, 15, 30, 0.85) 100%)' 
+          : '#ffffff',
+        borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#e2e8f0',
+        boxShadow: isDarkMode 
+          ? '0 16px 40px -10px rgba(0,0,0,0.5)' 
+          : '0 10px 30px -5px rgba(0,0,0,0.04)',
+      }}
+    >
       {/* Scanner Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-100 dark:border-white/5">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
-            <Camera size={20} />
+          <div 
+            className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"
+            style={{
+              background: isDarkMode ? 'rgba(99,102,241,0.15)' : '#e0e7ff',
+              border: '1px solid rgba(99,102,241,0.25)',
+            }}
+          >
+            <Camera size={20} className="text-indigo-500 dark:text-indigo-400" />
           </div>
           <div>
-            <h3 className="text-base font-bold text-white">Live Camera QR Scanner</h3>
-            <p className="text-xs text-slate-400">Point your camera at any hidden venue QR code</p>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">Live Camera QR Scanner</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Scan via real webcam or upload any saved QR image file</p>
           </div>
         </div>
 
-        {(scanState === 'success' || scanState === 'error') && (
+        {/* Hidden File Input for Image Upload */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleImageUpload}
+        />
+
+        <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={handleResumeScan}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-all shadow-lg shadow-indigo-600/20 cursor-pointer"
+            onClick={() => fileInputRef.current?.click()}
+            title="Upload a QR code image / screenshot"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer"
+            style={{
+              background: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : '#f8fafc',
+              borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : '#cbd5e1',
+              color: isDarkMode ? '#e2e8f0' : '#334155',
+            }}
           >
-            <RefreshCw size={14} />
-            Scan Again
+            <Upload size={14} className="text-indigo-500 dark:text-indigo-400" />
+            Upload Image
           </button>
-        )}
+
+          {(scanState === 'success' || scanState === 'error') && (
+            <button
+              onClick={handleResumeScan}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold text-xs transition-all shadow-lg shadow-indigo-500/20 cursor-pointer border-none"
+            >
+              <RefreshCw size={14} />
+              Scan Again
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Main Camera Viewfinder & Freeze Overlay */}
@@ -279,12 +362,21 @@ export default function ScavengerScanner({ onScanSuccess }) {
           <div className="absolute inset-0 bg-slate-950/90 p-6 flex flex-col items-center justify-center text-center space-y-3 z-10">
             <AlertCircle className="w-10 h-10 text-amber-400" />
             <p className="text-xs font-semibold text-slate-300 max-w-xs">{cameraError}</p>
-            <button
-              onClick={startCamera}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs transition-all border border-slate-700 cursor-pointer"
-            >
-              Retry Camera
-            </button>
+            <div className="flex items-center gap-2 pt-1 flex-wrap justify-center">
+              <button
+                onClick={startCamera}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs transition-all border border-slate-700 cursor-pointer"
+              >
+                Retry Camera
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-all border-none cursor-pointer flex items-center gap-1.5"
+              >
+                <Upload size={13} />
+                Upload QR Image
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -294,17 +386,17 @@ export default function ScavengerScanner({ onScanSuccess }) {
         <div
           className={`p-4 rounded-2xl border flex items-start gap-3 animate-slide-up ${
             feedback.type === 'success'
-              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-300'
               : feedback.type === 'duplicate'
-              ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
-              : 'bg-red-500/10 border-red-500/30 text-red-300'
+              ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-300'
+              : 'bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-300'
           }`}
         >
           <div className="mt-0.5">
             {feedback.type === 'success' ? (
-              <CheckCircle size={18} className="text-emerald-400" />
+              <CheckCircle size={18} className="text-emerald-500 dark:text-emerald-400" />
             ) : (
-              <AlertCircle size={18} className={feedback.type === 'duplicate' ? 'text-amber-400' : 'text-red-400'} />
+              <AlertCircle size={18} className={feedback.type === 'duplicate' ? 'text-amber-500 dark:text-amber-400' : 'text-red-500 dark:text-red-400'} />
             )}
           </div>
           <div className="flex-1">
@@ -313,7 +405,7 @@ export default function ScavengerScanner({ onScanSuccess }) {
           </div>
           <button
             onClick={handleResumeScan}
-            className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold transition-all cursor-pointer"
+            className="px-3 py-1.5 rounded-xl bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/20 text-xs font-bold transition-all cursor-pointer text-slate-800 dark:text-white border-none"
           >
             Scan Next
           </button>
@@ -321,24 +413,24 @@ export default function ScavengerScanner({ onScanSuccess }) {
       )}
 
       {/* Simulator Mode for Testing / Environments without Webcams */}
-      <div className="pt-4 border-t border-slate-800/80 space-y-3">
-        <div className="flex items-center justify-between text-xs text-slate-400">
-          <span className="font-semibold uppercase tracking-wider text-[10px] text-slate-500 flex items-center gap-1">
-            <Sparkles size={12} className="text-indigo-400" />
+      <div className="pt-4 border-t border-slate-100 dark:border-white/5 space-y-3">
+        <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+          <span className="font-semibold uppercase tracking-wider text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-1">
+            <Sparkles size={12} className="text-indigo-500 dark:text-indigo-400" />
             Testing & Code Simulator
           </span>
-          <span>Or click preset venue QR codes below</span>
+          <span>Click any preset venue QR code below</span>
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {PRESET_TEST_CODES.map((codeStr) => (
+          {activeCodesList.map((codeStr) => (
             <button
               key={codeStr}
               onClick={() => {
                 freezeCameraFeed();
                 handleParsedCode(codeStr);
               }}
-              className="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-indigo-600/30 hover:border-indigo-500/40 border border-slate-700 text-xs text-slate-300 font-mono transition-all cursor-pointer"
+              className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-indigo-500/10 dark:hover:bg-indigo-600/30 hover:border-indigo-500/40 border border-slate-200 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300 font-mono transition-all cursor-pointer"
             >
               {codeStr}
             </button>
@@ -360,11 +452,11 @@ export default function ScavengerScanner({ onScanSuccess }) {
             placeholder="Type custom QR string to test..."
             value={simulatedCode}
             onChange={(e) => setSimulatedCode(e.target.value)}
-            className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+            className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-indigo-500"
           />
           <button
             type="submit"
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer transition-all"
+            className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer transition-all border-none shadow-md shadow-indigo-500/20"
           >
             <Send size={12} />
             Test Scan
@@ -374,3 +466,4 @@ export default function ScavengerScanner({ onScanSuccess }) {
     </div>
   );
 }
+
