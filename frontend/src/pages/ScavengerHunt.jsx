@@ -4,7 +4,7 @@ import { useTheme } from '../context/ThemeContext.jsx';
 import ScavengerScanner from '../components/ScavengerScanner.jsx';
 import ScavengerProgressBar from '../components/ScavengerProgressBar.jsx';
 import ConfettiEffect from '../components/ConfettiEffect.jsx';
-import { Compass, Trophy, QrCode, ArrowLeft, RefreshCw, Sparkles, MapPin } from 'lucide-react';
+import { Compass, Trophy, QrCode, ArrowLeft, RefreshCw, Sparkles, MapPin, CheckCircle2, Award } from 'lucide-react';
 
 export default function ScavengerHunt() {
   const navigate = useNavigate();
@@ -79,13 +79,15 @@ export default function ScavengerHunt() {
     }
   };
 
+  const bgStyle = isDarkMode
+    ? 'radial-gradient(ellipse at 60% 0%, rgba(99,102,241,0.08) 0%, transparent 55%), radial-gradient(ellipse at 0% 80%, rgba(168,85,247,0.05) 0%, transparent 50%), #030712'
+    : 'radial-gradient(ellipse at 60% 0%, rgba(99,102,241,0.04) 0%, transparent 55%), radial-gradient(ellipse at 0% 80%, rgba(168,85,247,0.02) 0%, transparent 50%), #f8fafc';
+
   return (
     <div
-      className="min-h-screen text-slate-900 dark:text-white py-8 px-4 sm:px-6"
+      className="min-h-screen text-slate-900 dark:text-white"
       style={{
-        background: isDarkMode
-          ? 'radial-gradient(ellipse at 50% 0%, rgba(99,102,241,0.12) 0%, transparent 60%), #030712'
-          : 'radial-gradient(ellipse at 50% 0%, rgba(99,102,241,0.06) 0%, transparent 60%), #f8fafc',
+        background: bgStyle,
         fontFamily: "'Plus Jakarta Sans', sans-serif",
       }}
     >
@@ -96,46 +98,59 @@ export default function ScavengerHunt() {
         onClose={() => setShowConfetti(false)}
       />
 
-      <div className="max-w-4xl mx-auto space-y-8">
+      <main className="max-w-6xl mx-auto px-6 py-10 space-y-10">
         {/* Navigation & Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-2">
           <div>
-            <button
-              onClick={() => navigate('/customer/dashboard')}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition-colors mb-2 cursor-pointer bg-transparent border-none"
-            >
-              <ArrowLeft size={14} /> Back to Customer Dashboard
-            </button>
-            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+            <div className="flex items-center gap-2 mb-2">
+              <button
+                onClick={() => navigate('/customer/dashboard')}
+                className="inline-flex items-center gap-1.5 text-[11px] font-extrabold tracking-widest uppercase text-indigo-500 dark:text-indigo-400 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20 hover:bg-indigo-500/20 transition-all cursor-pointer"
+              >
+                <ArrowLeft size={12} /> Attendee Console
+              </button>
+              <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold">•</span>
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                Interactive Venue Quest
+              </span>
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight leading-tight flex items-center gap-3">
               Event Scavenger Hunt 🗺️
             </h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-              Scan hidden QR codes around venue zones to automatically update your game score!
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-xl font-normal">
+              Locate and scan secret QR markers placed across halls to earn points, complete quests, and unlock free food court rewards!
             </p>
           </div>
 
-          <div className="flex items-center gap-2 bg-slate-900/60 p-1.5 rounded-2xl border border-slate-800">
+          <div 
+            className="flex items-center gap-2 p-1.5 rounded-2xl border shrink-0 backdrop-blur-xl"
+            style={{
+              background: isDarkMode ? 'rgba(15, 23, 42, 0.7)' : '#ffffff',
+              borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#e2e8f0',
+              boxShadow: isDarkMode ? '0 8px 32px rgba(0, 0, 0, 0.3)' : '0 4px 16px rgba(0, 0, 0, 0.04)',
+            }}
+          >
             <button
               onClick={() => setActiveTab('scanner')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border-none ${
                 activeTab === 'scanner'
-                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/25'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/25'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-transparent'
               }`}
             >
               <QrCode size={15} />
-              QR Scanner
+              Live Scanner
             </button>
             <button
               onClick={() => setActiveTab('progress')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border-none ${
                 activeTab === 'progress'
-                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/25'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/25'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-transparent'
               }`}
             >
               <Trophy size={15} />
-              Dashboard ({score}/{maxScore})
+              Quest Log ({score}/{maxScore})
             </button>
           </div>
         </div>
@@ -146,20 +161,46 @@ export default function ScavengerHunt() {
         {/* Main Tab Content */}
         {activeTab === 'scanner' ? (
           <div className="space-y-6">
-            <ScavengerScanner onScanSuccess={handleScanSuccess} />
+            <ScavengerScanner onScanSuccess={handleScanSuccess} codes={codes} />
           </div>
         ) : (
-          <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-xl shadow-xl space-y-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Compass className="text-indigo-400" size={18} />
-                Venue Code Locations & Hints
-              </h3>
+          <div 
+            className="rounded-3xl p-6 sm:p-8 backdrop-blur-xl border space-y-6 transition-all"
+            style={{
+              background: isDarkMode 
+                ? 'linear-gradient(145deg, rgba(15, 23, 42, 0.7) 0%, rgba(10, 15, 30, 0.85) 100%)' 
+                : '#ffffff',
+              borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#e2e8f0',
+              boxShadow: isDarkMode 
+                ? '0 16px 40px -10px rgba(0,0,0,0.5)' 
+                : '0 10px 30px -5px rgba(0,0,0,0.04)',
+            }}
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-white/5">
+              <div className="flex items-center gap-3">
+                <div 
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center"
+                  style={{
+                    background: isDarkMode ? 'rgba(99,102,241,0.15)' : '#e0e7ff',
+                    border: '1px solid rgba(99,102,241,0.25)',
+                  }}
+                >
+                  <Compass className="text-indigo-500 dark:text-indigo-400" size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                    Venue Code Locations & Hints
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Find these physical checkpoint markers across the event floor
+                  </p>
+                </div>
+              </div>
               <button
                 onClick={fetchProgress}
-                className="flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 font-semibold cursor-pointer bg-transparent border-none"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10 transition-all cursor-pointer border border-indigo-500/20 bg-transparent"
               >
-                <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
+                <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh Hints
               </button>
             </div>
 
@@ -167,41 +208,60 @@ export default function ScavengerHunt() {
               {codes.map((item, idx) => (
                 <div
                   key={item.code || idx}
-                  className={`p-4 rounded-2xl border transition-all flex items-center justify-between gap-4 ${
-                    item.isClaimed
-                      ? 'bg-emerald-500/10 border-emerald-500/30'
-                      : 'bg-slate-950 border-slate-800'
-                  }`}
+                  className="p-4 sm:p-5 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                  style={{
+                    background: item.isClaimed
+                      ? (isDarkMode ? 'rgba(16, 185, 129, 0.08)' : '#f0fdf4')
+                      : (isDarkMode ? 'rgba(255, 255, 255, 0.02)' : '#f8fafc'),
+                    borderColor: item.isClaimed
+                      ? (isDarkMode ? 'rgba(16, 185, 129, 0.25)' : '#bbf7d0')
+                      : (isDarkMode ? 'rgba(255, 255, 255, 0.05)' : '#e2e8f0'),
+                  }}
                 >
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-start gap-4">
                     <div
-                      className={`w-10 h-10 rounded-2xl flex items-center justify-center font-extrabold text-sm ${
+                      className={`w-11 h-11 rounded-2xl flex items-center justify-center font-black text-sm shrink-0 transition-transform ${
                         item.isClaimed
-                          ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20'
-                          : 'bg-slate-800 text-slate-400'
+                          ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25'
+                          : 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                       }`}
                     >
-                      #{idx + 1}
+                      {item.isClaimed ? <CheckCircle2 size={20} /> : `#${idx + 1}`}
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-white">{item.title}</h4>
-                      <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-                        <MapPin size={12} className="text-indigo-400" />
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        {item.title}
+                        {item.isClaimed && (
+                          <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                            Completed
+                          </span>
+                        )}
+                      </h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-1 font-medium">
+                        <MapPin size={13} className="text-indigo-500 dark:text-indigo-400 shrink-0" />
                         {item.locationHint}
                       </p>
-                      <span className="text-[10px] font-mono text-slate-500 block mt-1">Code: {item.code}</span>
+                      <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500 block mt-1">
+                        Marker Token: <span className="font-bold">{item.code}</span>
+                      </span>
                     </div>
                   </div>
 
-                  <div className="text-right">
+                  <div className="sm:text-right shrink-0">
                     <span
-                      className={`inline-block text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider ${
+                      className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl uppercase tracking-wider ${
                         item.isClaimed
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                          : 'bg-slate-800 text-slate-400 border border-slate-700'
+                          ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
                       }`}
                     >
-                      {item.isClaimed ? 'Claimed (+1 Pt)' : 'Unclaimed'}
+                      {item.isClaimed ? (
+                        <>
+                          <Award size={13} /> Claimed (+1 Point)
+                        </>
+                      ) : (
+                        'Unclaimed'
+                      )}
                     </span>
                   </div>
                 </div>
@@ -209,7 +269,8 @@ export default function ScavengerHunt() {
             </div>
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }
+
