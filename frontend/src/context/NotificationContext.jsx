@@ -140,7 +140,15 @@ export function NotificationProvider({ children }) {
     // Cleanup connection on token change or unmount
     return () => {
       if (wsRef.current) {
-        wsRef.current.close();
+        // Prevent console error if closed while still connecting during React StrictMode mount/unmount cycle
+        if (wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.close();
+        } else if (wsRef.current.readyState === WebSocket.CONNECTING) {
+          // Nullify listeners to prevent browser log noise during hot reloads
+          wsRef.current.onclose = null;
+          wsRef.current.onerror = null;
+          wsRef.current.close();
+        }
       }
       if (reconnectTimeout) {
         clearTimeout(reconnectTimeout);
