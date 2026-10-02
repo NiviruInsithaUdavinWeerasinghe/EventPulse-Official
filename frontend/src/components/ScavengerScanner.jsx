@@ -21,6 +21,8 @@ export default function ScavengerScanner({ onScanSuccess, codes = [] }) {
     ? codes.map(c => c.code)
     : ['HUNT_ZONE_A_101', 'HUNT_VIP_LOUNGE_202', 'HUNT_STAGE_NORTH_303', 'HUNT_FOOD_COURT_404', 'HUNT_MAIN_HALL_505'];
 
+  const isMountedRef = useRef(true);
+
   // Initialize camera stream
   const startCamera = async () => {
     setCameraError(null);
@@ -36,13 +38,27 @@ export default function ScavengerScanner({ onScanSuccess, codes = [] }) {
         video: { facingMode: 'environment' }
       });
 
+      if (!isMountedRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.setAttribute('playsinline', 'true');
-        await videoRef.current.play();
-        requestAnimationFrame(tickScan);
+        try {
+          await videoRef.current.play();
+        } catch (playErr) {
+          // If aborted by rapid unmount or pause, ignore gracefully
+          if (playErr.name === 'AbortError') return;
+          throw playErr;
+        }
+        if (isMountedRef.current) {
+          requestAnimationFrame(tickScan);
+        }
       }
     } catch (err) {
+      if (!isMountedRef.current) return;
       console.warn('Camera initialization notice:', err);
       let msg = 'Could not access camera.';
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
@@ -77,7 +93,11 @@ export default function ScavengerScanner({ onScanSuccess, codes = [] }) {
       animationFrameRef.current = null;
     }
     if (videoRef.current) {
-      videoRef.current.pause();
+      try {
+        videoRef.current.pause();
+      } catch (e) {
+        // ignore pause failure if stream already stopped
+      }
     }
   };
 
@@ -88,7 +108,7 @@ export default function ScavengerScanner({ onScanSuccess, codes = [] }) {
         const video = videoRef.current;
         if (video.videoWidth > 0 && video.videoHeight > 0) {
           const canvas = canvasRef.current || document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
           canvas.width = video.videoWidth;
           canvas.height = video.videoHeight;
@@ -246,9 +266,11 @@ export default function ScavengerScanner({ onScanSuccess, codes = [] }) {
   };
 
   useEffect(() => {
+    isMountedRef.current = true;
     // Start camera automatically on component mount
     startCamera();
     return () => {
+      isMountedRef.current = false;
       stopCamera();
     };
   }, []);
