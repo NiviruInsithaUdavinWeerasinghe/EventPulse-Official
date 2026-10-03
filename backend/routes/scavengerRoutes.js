@@ -83,29 +83,35 @@ router.post('/scan', protect, async (req, res) => {
       { new: true }
     );
 
-    // 4.5. Check if score is >= 5 and attendee does not already have a voucher
+    // 4.5. Check if total unique scans >= 6 and attendee does not already have a voucher
+    const userTotalScans = await ScannedCode.countDocuments({ user_id: userId });
     let earnedVoucher = null;
-    if (updatedUser && updatedUser.scavengerScore >= 5) {
+
+    if (userTotalScans >= 6) {
       const existingVoucher = await Voucher.findOne({ user: userId });
       if (!existingVoucher) {
         const secureCode = crypto.randomBytes(8).toString('hex').toUpperCase();
         earnedVoucher = await Voucher.create({
           user: userId,
           code: secureCode,
+          title: 'Food Court Quest Voucher',
+          faceValue: 500.00,
           status: 'Active'
         });
       }
     }
 
-    // 5. Derive dynamic maxScore based on active scavenger hunt codes
+    // 5. Total active codes in venue (can be 20+), quest target is standardized to 6
     const totalActiveCodes = await ScavengerCode.countDocuments({ isActive: true });
-    const maxScore = totalActiveCodes > 0 ? totalActiveCodes : 5;
+    const questTarget = 6;
+    const maxScore = totalActiveCodes > 0 ? totalActiveCodes : questTarget;
 
     return res.status(200).json({
       success: true,
       message: 'Code claimed successfully!',
       score: updatedUser ? updatedUser.scavengerScore : 1,
       maxScore,
+      questTarget,
       earnedVoucher: earnedVoucher ? { code: earnedVoucher.code, status: earnedVoucher.status } : null,
       scannedCode: {
         code: validCode.code,
@@ -139,7 +145,10 @@ router.get('/progress', protect, async (req, res) => {
 
     const allCodes = await ScavengerCode.find({ isActive: true }).select('code title locationHint points');
     const totalActiveCount = allCodes.length;
-    const maxScore = totalActiveCount > 0 ? totalActiveCount : 5;
+    const questTarget = 6;
+    const maxScore = totalActiveCount > 0 ? totalActiveCount : 6;
+
+    const userVoucher = await Voucher.findOne({ user: userId });
 
     const codeListWithStatus = allCodes.map(item => ({
       code: item.code,
@@ -153,7 +162,10 @@ router.get('/progress', protect, async (req, res) => {
       success: true,
       score: userScore,
       maxScore,
+      questTarget,
       claimedCount: claimedRecords.length,
+      isQuestCompleted: claimedRecords.length >= questTarget,
+      voucher: userVoucher ? { code: userVoucher.code, status: userVoucher.status, faceValue: userVoucher.faceValue || 500 } : null,
       claimedCodes: claimedStrings,
       codes: codeListWithStatus,
     });
@@ -305,6 +317,88 @@ router.get('/vouchers', protect, async (req, res) => {
     });
   } catch (err) {
     console.error('Error in GET /api/scavenger/vouchers:', err);
+    return res.status(500).json({ success: false, message: 'Server Error' });
+  }
+});
+
+/**
+ * POST /api/scavenger/admin/redeem-voucher
+ * Organizer Help/Prize Desk route: Redeem attendee voucher for physical event merchandise or gifts
+ */
+router.post('/admin/redeem-voucher', protect, async (req, res) => {
+  try {
+    const { voucherCode } = req.body;
+    if (!voucherCode || !voucherCode.trim()) {
+      return res.status(400).json({ success: false, message: 'Voucher code is required.' });
+    }
+
+    const cleanCode = voucherCode.trim().toUpperCase();
+    const voucher = await Voucher.findOne({ code: cleanCode }).populate('user', 'fullName email');
+
+    if (!voucher) {
+      return res.status(404).json({ success: false, message: 'Invalid voucher code.' });
+    }
+
+    if (voucher.status === 'Redeemed') {
+      return res.status(400).json({
+        success: false,
+        message: `Voucher was already redeemed on ${new Date(voucher.redeemedAt).toLocaleString()}.`,
+        voucher
+      });
+    }
+
+    voucher.status = 'Redeemed';
+    voucher.redeemedAt = new Date();
+    voucher.redeemedBy = req.user.id;
+    voucher.redeemerRole = 'organizer';
+    await voucher.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `Voucher ${voucher.code} successfully verified and marked Redeemed at Organizer Prize Desk!`,
+      voucher
+    });
+  } catch (err) {
+    console.error('Error redeeming voucher at organizer desk:', err);
+    return res.status(500).json({ success: false, message: 'Server Error' });
+  }
+});
+
+/**
+ * GET /api/scavenger/leaderboard
+ * Public/Attendee/Organizer route: Return Top 10 Fast-Finishers and high scorers
+ */
+router.get('/leaderboard', async (req, res) => {
+  try {
+    // 1. Find users who have claimed scavenger hunt codes
+    const topUsers = await User.find({ scavengerScore: { $gt: 0 } })
+      .select('fullName email scavengerScore updatedAt')
+      .sort({ scavengerScore: -1, updatedAt: 1 })
+      .limit(10)
+      .lean();
+
+    // 2. Enrich with total scan count and completion status (>= 6)
+    const leaderboard = await Promise.all(topUsers.map(async (u, idx) => {
+      const scanCount = await ScannedCode.countDocuments({ user_id: u._id });
+      const voucher = await Voucher.findOne({ user: u._id });
+      return {
+        rank: idx + 1,
+        id: u._id,
+        name: u.fullName || 'Anonymous Explorer',
+        score: u.scavengerScore,
+        scans: scanCount,
+        hasCompletedQuest: scanCount >= 6,
+        isVoucherRedeemed: voucher ? voucher.status === 'Redeemed' : false,
+        achievedAt: u.updatedAt
+      };
+    }));
+
+    return res.status(200).json({
+      success: true,
+      leaderboard
+    });
+  } catch (err) {
+    console.error('Error fetching scavenger leaderboard:', err);
     return res.status(500).json({ success: false, message: 'Server Error' });
   }
 });

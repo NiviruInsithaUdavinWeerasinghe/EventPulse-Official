@@ -64,6 +64,9 @@ export function NotificationProvider({ children }) {
     updateBalance();
 
     let reconnectTimeout;
+    let retryAttempt = 0;
+    const MAX_RETRY_DELAY = 30000;
+
     const connectWS = () => {
       const currentToken = localStorage.getItem('token');
       if (!currentToken) return;
@@ -75,9 +78,13 @@ export function NotificationProvider({ children }) {
           ? `ws://${window.location.hostname}:5000/?token=${currentToken}`
           : `${wsProtocol}//${window.location.host}/ws?token=${currentToken}`);
 
-
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
+
+      ws.onopen = () => {
+        // Reset exponential backoff attempts on successful connection
+        retryAttempt = 0;
+      };
 
       ws.onmessage = (event) => {
         try {
@@ -109,10 +116,6 @@ export function NotificationProvider({ children }) {
               setActiveAlert(null);
             }, 15000);
           } else if (data.type === 'flash_sale_broadcast') {
-            // 'flash_sale_broadcast' channel — every attendee client shares
-            // this one WS connection, so this fires for all of them at once.
-            // Mounting the banner (and unmounting it at zero) is owned
-            // entirely by FlashSaleBannerBar's own countdown interval below.
             setFlashSaleBanner({
               vendorName: data.vendorName,
               promoText: data.promoText,
@@ -125,8 +128,11 @@ export function NotificationProvider({ children }) {
       };
 
       ws.onclose = () => {
-        console.log('WS connection closed. Reconnecting in 5s...');
-        reconnectTimeout = setTimeout(connectWS, 5000);
+        // EP-174 (US-802-SUB-1): Calculate exponential backoff interval: base 1000ms * 2^attempts (with jitter)
+        const delay = Math.min(MAX_RETRY_DELAY, Math.pow(2, retryAttempt) * 1000 + Math.floor(Math.random() * 500));
+        retryAttempt++;
+        console.log(`WS connection closed. Reconnecting with exponential backoff in ${Math.round(delay / 1000)}s (Attempt #${retryAttempt})...`);
+        reconnectTimeout = setTimeout(connectWS, delay);
       };
 
       ws.onerror = (err) => {
@@ -144,7 +150,6 @@ export function NotificationProvider({ children }) {
         if (wsRef.current.readyState === WebSocket.OPEN) {
           wsRef.current.close();
         } else if (wsRef.current.readyState === WebSocket.CONNECTING) {
-          // Nullify listeners to prevent browser log noise during hot reloads
           wsRef.current.onclose = null;
           wsRef.current.onerror = null;
           wsRef.current.close();
@@ -159,8 +164,31 @@ export function NotificationProvider({ children }) {
     };
   }, []);
 
+  // EP-173 (US-801-SUB-2): Global fetch network error hook & notification banner
+  const notifyNetworkError = (status, customMessage) => {
+    if (alertTimeoutRef.current) clearTimeout(alertTimeoutRef.current);
+    setActiveAlert({
+      type: 'TX_REJECTED',
+      title: status ? `API Error (${status})` : 'Network Timeout',
+      message: customMessage || 'Unable to communicate with EventPulse backend. Please verify connection.',
+      vendorName: 'System Gatekeeper',
+      timestamp: new Date()
+    });
+    alertTimeoutRef.current = setTimeout(() => setActiveAlert(null), 8000);
+  };
+
   return (
-    <NotificationContext.Provider value={{ activeAlert, setActiveAlert, walletBalance, setWalletBalance, currency, updateBalance, flashSaleBanner, setFlashSaleBanner }}>
+    <NotificationContext.Provider value={{ 
+      activeAlert, 
+      setActiveAlert, 
+      walletBalance, 
+      setWalletBalance, 
+      currency, 
+      updateBalance, 
+      flashSaleBanner, 
+      setFlashSaleBanner,
+      notifyNetworkError 
+    }}>
       {children}
 
       {/* ── Flash Sale Broadcast Banner (US-302-SUB-3) ──

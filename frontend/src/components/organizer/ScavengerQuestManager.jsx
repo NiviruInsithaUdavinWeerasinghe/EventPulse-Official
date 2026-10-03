@@ -11,7 +11,8 @@ import {
   CheckCircle2, 
   RefreshCw,
   X,
-  ExternalLink
+  ExternalLink,
+  Gift
 } from 'lucide-react';
 
 export default function ScavengerQuestManager() {
@@ -288,17 +289,20 @@ export default function ScavengerQuestManager() {
 
         <div className="p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800/80 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">Completion Target</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">Quest Target</span>
             <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold">
               <Sparkles size={16} />
             </div>
           </div>
           <div className="text-2xl font-black text-slate-900 dark:text-white mt-2">
-            5 Checkpoints
+            6 Checkpoints
           </div>
-          <p className="text-[11px] text-slate-400 mt-0.5">Unlocks Food Court voucher reward</p>
+          <p className="text-[11px] text-slate-400 mt-0.5">Unlocks LKR 500 Food Court voucher reward</p>
         </div>
       </div>
+
+      {/* ── Organizer Prize Desk Voucher Redemption Station ──────── */}
+      <OrganizerVoucherRedemptionStation onRedeemSuccess={fetchCodes} />
 
       {/* ── Checkpoints Grid / Card Table ─────────────────────── */}
       <div className="rounded-3xl bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800/80 p-6 sm:p-8 shadow-xs space-y-6">
@@ -546,6 +550,123 @@ export default function ScavengerQuestManager() {
                 <Download size={14} /> Download PNG
               </a>
             </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Organizer Help Desk Voucher Redemption Sub-component ────────────
+function OrganizerVoucherRedemptionStation({ onRedeemSuccess }) {
+  const [voucherInput, setVoucherInput] = useState('');
+  const [isRedeeming, setIsRedeeming] = useState(false);
+  const [redeemResult, setRedeemResult] = useState(null); // { success: boolean, message: string, voucher?: any }
+
+  const handleRedeemVoucher = async (e) => {
+    e.preventDefault();
+    if (!voucherInput.trim()) return;
+
+    try {
+      setIsRedeeming(true);
+      setRedeemResult(null);
+
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const res = await fetch('/api/scavenger/admin/redeem-voucher', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ voucherCode: voucherInput.trim() })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setRedeemResult({
+          success: true,
+          message: data.message,
+          voucher: data.voucher
+        });
+        setVoucherInput('');
+        if (onRedeemSuccess) onRedeemSuccess();
+      } else {
+        setRedeemResult({
+          success: false,
+          message: data.message || 'Failed to redeem voucher'
+        });
+      }
+    } catch (err) {
+      setRedeemResult({
+        success: false,
+        message: 'Network error connecting to prize desk service.'
+      });
+    } finally {
+      setIsRedeeming(false);
+    }
+  };
+
+  return (
+    <div className="p-6 rounded-3xl bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800/80 shadow-xs space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-zinc-800">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold">
+            <Gift size={20} />
+          </div>
+          <div>
+            <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
+              Organizer Prize Desk & Vendor Subsidy Audit 🎟️
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-zinc-400">
+              Verify attendee 16-character quest vouchers for physical prize pickup or review vendor food subsidies (LKR 500.00/each).
+            </p>
+          </div>
+        </div>
+        <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/20 self-start sm:self-auto">
+          Help Desk Terminal
+        </span>
+      </div>
+
+      <form onSubmit={handleRedeemVoucher} className="flex flex-col sm:flex-row items-stretch gap-3">
+        <div className="relative flex-1">
+          <input
+            type="text"
+            value={voucherInput}
+            onChange={(e) => setVoucherInput(e.target.value.toUpperCase())}
+            placeholder="Enter attendee voucher code (e.g. 8A3F1B0C4D5E6F7A)"
+            maxLength={24}
+            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 font-mono text-xs sm:text-sm font-bold tracking-wider text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 uppercase"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={isRedeeming || !voucherInput.trim()}
+          className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer shadow-md shadow-amber-500/20 border-none shrink-0"
+        >
+          {isRedeeming ? 'Verifying...' : 'Verify & Redeem Voucher'}
+        </button>
+      </form>
+
+      {redeemResult && (
+        <div 
+          className={`p-4 rounded-2xl border text-xs flex items-start gap-3 animate-fade-in ${
+            redeemResult.success 
+              ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20 text-emerald-800 dark:text-emerald-300' 
+              : 'bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/20 text-rose-800 dark:text-rose-300'
+          }`}
+        >
+          <div className="shrink-0 mt-0.5">
+            {redeemResult.success ? <CheckCircle2 size={16} /> : <X size={16} />}
+          </div>
+          <div className="flex-1">
+            <p className="font-bold">{redeemResult.message}</p>
+            {redeemResult.voucher && (
+              <p className="text-[11px] opacity-80 mt-1">
+                Issued to: <span className="font-semibold">{redeemResult.voucher.user?.fullName || 'Attendee'}</span> ({redeemResult.voucher.user?.email || 'N/A'}) • Face Value: LKR {redeemResult.voucher.faceValue || 500}.00
+              </p>
+            )}
           </div>
         </div>
       )}
