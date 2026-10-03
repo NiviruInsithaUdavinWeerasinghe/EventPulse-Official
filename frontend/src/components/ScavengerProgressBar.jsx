@@ -2,9 +2,11 @@ import React from 'react';
 import { useTheme } from '../context/ThemeContext.jsx';
 import { Trophy, CheckCircle2, Lock, Sparkles, MapPin, RotateCcw } from 'lucide-react';
 
-export default function ScavengerProgressBar({ score = 0, maxScore = 5, codes = [], onReset }) {
+export default function ScavengerProgressBar({ score = 0, targetGoal = 6, totalVenueCodes = 6, codes = [], onReset, voucher }) {
   const { isDarkMode } = useTheme();
-  const percentage = Math.min(100, Math.round((score / (maxScore || 1)) * 100));
+  const claimedCount = codes ? codes.filter(c => c.isClaimed).length : score;
+  const percentage = Math.min(100, Math.round((claimedCount / (targetGoal || 6)) * 100));
+  const isGoalReached = claimedCount >= targetGoal;
 
   return (
     <div 
@@ -33,11 +35,11 @@ export default function ScavengerProgressBar({ score = 0, maxScore = 5, codes = 
               <Trophy className="text-amber-500 dark:text-amber-400" size={17} />
             </div>
             <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
-              Scavenger Hunt Live Progress
+              Scavenger Hunt Quest & Live Milestones
             </h2>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Explore venue zones, locate hidden QR codes, and claim your rewards!
+            Scan any 6 secret QR checkpoints placed across halls to complete the quest and unlock your Free Food Court Voucher!
           </p>
         </div>
 
@@ -54,9 +56,11 @@ export default function ScavengerProgressBar({ score = 0, maxScore = 5, codes = 
           )}
 
           <div className="text-right">
-            <span className="text-2xl font-black text-slate-900 dark:text-white">{score}</span>
-            <span className="text-sm font-semibold text-slate-400"> / {maxScore}</span>
-            <p className="text-[10px] uppercase tracking-wider font-bold text-indigo-500 dark:text-indigo-400">Codes Claimed</p>
+            <span className="text-2xl font-black text-slate-900 dark:text-white">{claimedCount}</span>
+            <span className="text-sm font-semibold text-slate-400"> / {targetGoal} Quest Goal</span>
+            <p className="text-[10px] uppercase tracking-wider font-bold text-indigo-500 dark:text-indigo-400">
+              ({codes.length} Total Hidden in Venue)
+            </p>
           </div>
           <div 
             className="w-12 h-12 rounded-2xl flex items-center justify-center font-extrabold text-indigo-500 dark:text-indigo-400 text-sm"
@@ -70,7 +74,7 @@ export default function ScavengerProgressBar({ score = 0, maxScore = 5, codes = 
         </div>
       </div>
 
-      {/* Main Progress Bar Component (SUB-3) */}
+      {/* Main Progress Bar Component */}
       <div className="space-y-2">
         <div 
           className="relative w-full h-3.5 rounded-full overflow-hidden p-0.5 border"
@@ -80,15 +84,15 @@ export default function ScavengerProgressBar({ score = 0, maxScore = 5, codes = 
           }}
         >
           <div
-            className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 transition-all duration-700 ease-out shadow-[0_0_15px_rgba(168,85,247,0.4)]"
+            className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 transition-all duration-700 ease-out shadow-[0_0_15px_rgba(16,185,129,0.4)]"
             style={{ width: `${percentage}%` }}
           />
         </div>
         <div className="flex justify-between text-[11px] font-semibold text-slate-400 px-1">
-          <span>0%</span>
-          <span>50%</span>
-          <span className="font-bold text-indigo-500 dark:text-indigo-400">
-            100% {percentage === 100 ? '🎉 All Claimed!' : ''}
+          <span>0 (Start)</span>
+          <span>3 / 6 (Halfway)</span>
+          <span className={`font-bold ${isGoalReached ? 'text-emerald-500 dark:text-emerald-400' : 'text-indigo-500'}`}>
+            6 / 6 {isGoalReached ? '🎉 Quest Complete (Voucher Unlocked!)' : ''}
           </span>
         </div>
       </div>
@@ -127,11 +131,11 @@ export default function ScavengerProgressBar({ score = 0, maxScore = 5, codes = 
                   </div>
                   <div className="min-w-0">
                     <p className={`text-xs font-bold truncate ${item.isClaimed ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>
-                      {item.title || `QR Code #${idx + 1}`}
+                      {item.isClaimed ? item.title : `Mystery Checkpoint #${idx + 1}`}
                     </p>
                     <p className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-1 truncate mt-0.5">
                       <MapPin size={10} className="flex-shrink-0 text-indigo-500 dark:text-indigo-400" />
-                      {item.locationHint || 'Explore venue area'}
+                      {item.isClaimed ? item.locationHint : 'Hidden somewhere in the venue'}
                     </p>
                   </div>
                 </div>
