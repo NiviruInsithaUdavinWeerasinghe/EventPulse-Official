@@ -522,9 +522,16 @@ export default function VendorAnalytics() {
                             {tx.customerName ? tx.customerName.charAt(0).toUpperCase() : 'C'}
                           </div>
                           <div>
-                            <h4 className="text-sm font-bold text-white group-hover:text-indigo-400 transition-colors">
-                              {tx.customerName || 'Event Attendee'}
-                            </h4>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-sm font-bold text-white group-hover:text-indigo-400 transition-colors">
+                                {tx.customerName || 'Event Attendee'}
+                              </h4>
+                              {tx.isVoucher && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                                  🎟️ Quest Voucher
+                                </span>
+                              )}
+                            </div>
                             <div className="flex flex-wrap items-center gap-2 text-slate-500 text-[10px] font-semibold mt-0.5">
                               <span className="flex items-center gap-1">
                                 <Calendar className="w-3 h-3" />
@@ -544,15 +551,19 @@ export default function VendorAnalytics() {
                           
                           {/* Transaction Reference ID */}
                           <div className="space-y-1">
-                            <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">Transaction ID</span>
+                            <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                              {tx.isVoucher ? 'Voucher Code / Ref' : 'Transaction ID'}
+                            </span>
                             <div className="flex items-center gap-1.5 text-xs text-slate-400 font-bold bg-white/[0.02] border border-white/5 px-2.5 py-1 rounded-lg">
-                              <span className="font-mono">{tx.transactionId.substring(0, 12)}...</span>
+                              <span className="font-mono">
+                                {tx.voucherCode || (tx.transactionId ? `${tx.transactionId.substring(0, 12)}...` : 'N/A')}
+                              </span>
                               <button
-                                onClick={() => handleCopyId(tx.transactionId)}
+                                onClick={() => handleCopyId(tx.voucherCode || tx.transactionId)}
                                 className="text-slate-500 hover:text-white transition-colors cursor-pointer"
                                 title="Copy ID"
                               >
-                                {copiedId === tx.transactionId ? (
+                                {copiedId === (tx.voucherCode || tx.transactionId) ? (
                                   <Check className="w-3.5 h-3.5 text-emerald-400" />
                                 ) : (
                                   <Copy className="w-3.5 h-3.5" />
@@ -566,7 +577,9 @@ export default function VendorAnalytics() {
                             
                             {/* Gross Sales */}
                             <div className="text-left md:text-right space-y-0.5">
-                              <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">Gross</span>
+                              <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                                {tx.isVoucher ? 'Organizer Subsidy' : 'Gross'}
+                              </span>
                               <span className="block text-xs font-semibold text-slate-300">
                                 LKR {tx.grossAmount.toLocaleString()}
                               </span>
@@ -574,9 +587,11 @@ export default function VendorAnalytics() {
 
                             {/* 5% Split Fee */}
                             <div className="text-left md:text-right space-y-0.5">
-                              <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">Split Fee (5%)</span>
-                              <span className="block text-xs font-semibold text-amber-500">
-                                -LKR {tx.platformSplit.toLocaleString()}
+                              <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                                {tx.isVoucher ? 'Subsidy Fee (0%)' : 'Split Fee (5%)'}
+                              </span>
+                              <span className={`block text-xs font-semibold ${tx.isVoucher ? 'text-slate-400' : 'text-amber-500'}`}>
+                                {tx.isVoucher ? 'LKR 0.00' : `-LKR ${tx.platformSplit.toLocaleString()}`}
                               </span>
                             </div>
 

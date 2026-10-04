@@ -188,36 +188,59 @@ export default function ScavengerHunt() {
             {/* Gamification Progress Bar Component */}
             <ScavengerProgressBar score={score} targetGoal={questTarget} totalVenueCodes={codes.length} codes={codes} onReset={handleReset} voucher={voucher} />
 
-            {/* Voucher Unlocked Alert Banner if 6 codes claimed */}
+            {/* Voucher Alert Banner if 6 codes claimed */}
             {voucher && (
               <div 
                 className="p-5 sm:p-6 rounded-3xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in"
                 style={{
                   background: isDarkMode 
-                    ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(217, 119, 6, 0.1) 100%)' 
-                    : '#fffbeb',
-                  borderColor: isDarkMode ? 'rgba(245, 158, 11, 0.3)' : '#fde68a',
+                    ? (voucher.status === 'Redeemed'
+                        ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.6) 100%)'
+                        : 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(217, 119, 6, 0.1) 100%)')
+                    : (voucher.status === 'Redeemed' ? '#f8fafc' : '#fffbeb'),
+                  borderColor: isDarkMode 
+                    ? (voucher.status === 'Redeemed' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(245, 158, 11, 0.3)')
+                    : (voucher.status === 'Redeemed' ? '#e2e8f0' : '#fde68a'),
                 }}
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-black shadow-lg shadow-amber-500/30 shrink-0">
-                    <Gift size={24} />
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black shrink-0 ${
+                    voucher.status === 'Redeemed'
+                      ? 'bg-slate-200 dark:bg-white/10 text-slate-500 dark:text-slate-400'
+                      : 'bg-amber-500 text-white shadow-lg shadow-amber-500/30'
+                  }`}>
+                    {voucher.status === 'Redeemed' ? <CheckCircle2 size={24} className="text-emerald-500" /> : <Gift size={24} />}
                   </div>
                   <div>
-                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-amber-600 dark:text-amber-400">
-                      🎉 Quest Reward Unlocked
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] font-extrabold uppercase tracking-widest ${
+                        voucher.status === 'Redeemed'
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : 'text-amber-600 dark:text-amber-400'
+                      }`}>
+                        {voucher.status === 'Redeemed' ? '✓ Voucher Redeemed at Food Court' : '🎉 Quest Reward Unlocked'}
+                      </span>
+                      {voucher.status === 'Redeemed' && (
+                        <span className="text-[10px] bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-2 py-0.5 rounded-full font-bold">
+                          Claimed
+                        </span>
+                      )}
+                    </div>
                     <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
                       Free Food Court Voucher (LKR {voucher.faceValue || 500}.00)
                     </h3>
                     <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
-                      Code: <span className="font-mono font-bold text-amber-600 dark:text-amber-300">{voucher.code}</span> • Subsidized by Event Organizer
+                      Code: <span className="font-mono font-bold text-slate-700 dark:text-slate-300">{voucher.code}</span> • {voucher.status === 'Redeemed' ? `Redeemed on ${new Date(voucher.redeemedAt || Date.now()).toLocaleDateString()}` : 'Subsidized by Event Organizer'}
                     </p>
                   </div>
                 </div>
                 <Link
                   to="/customer/dashboard"
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold hover:brightness-110 shadow-md shadow-amber-500/20 transition-all shrink-0 no-underline"
+                  className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 no-underline ${
+                    voucher.status === 'Redeemed'
+                      ? 'bg-slate-200 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/15 text-slate-800 dark:text-slate-200'
+                      : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:brightness-110 shadow-md shadow-amber-500/20'
+                  }`}
                 >
                   View in My Vouchers →
                 </Link>

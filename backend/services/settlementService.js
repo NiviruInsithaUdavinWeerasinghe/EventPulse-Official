@@ -96,11 +96,16 @@ export const getVendorPayoutData = async () => {
   // Import models inside service method or top level
   const PaymentTokenModule = await import('../models/PaymentToken.js');
   const UserModule = await import('../models/User.js');
+  const VoucherModule = await import('../models/Voucher.js');
   const PaymentToken = PaymentTokenModule.default;
   const User = UserModule.default;
+  const Voucher = VoucherModule.default;
 
   // Fetch all tokens with status 'Used'
   const usedTokens = await PaymentToken.find({ status: 'Used' }).populate('vendorId', 'fullName email');
+
+  // Fetch all Scavenger Hunt food vouchers redeemed by vendors
+  const redeemedVouchers = await Voucher.find({ status: 'Redeemed', redeemedBy: { $ne: null } }).populate('redeemedBy', 'fullName email');
 
   // Group by vendor
   const vendorMap = new Map();
@@ -126,6 +131,9 @@ export const getVendorPayoutData = async () => {
         vendorId: vId,
         vendorName: token.vendorId.fullName || token.vendorId.email || 'Unknown Vendor',
         totalScans: 0,
+        salesScans: 0,
+        voucherScans: 0,
+        voucherSubsidy: 0,
         grossRevenue: 0,
         platformFee: 0,
         netPayout: 0,
@@ -134,17 +142,53 @@ export const getVendorPayoutData = async () => {
 
     const entry = vendorMap.get(vId);
     const amount = token.debitedAmount ? parseFloat(token.debitedAmount.toString()) : 0;
+    const fee = round2(amount * splitRate);
     entry.totalScans += 1;
+    entry.salesScans = (entry.salesScans || 0) + 1;
     entry.grossRevenue = round2(entry.grossRevenue + amount);
+    entry.platformFee = round2(entry.platformFee + fee);
+    entry.netPayout = round2(entry.netPayout + (amount - fee));
   }
 
-  // Calculate platform fee & net payout per vendor with 2 decimal places rounding
+  // Add redeemed vouchers (organizer reimbursement subsidy without platform commission deduction)
+  for (const voucher of redeemedVouchers) {
+    if (!voucher.redeemedBy) continue;
+    const vId = String(voucher.redeemedBy._id || voucher.redeemedBy);
+    if (!vendorMap.has(vId)) {
+      vendorMap.set(vId, {
+        vendorId: vId,
+        vendorName: voucher.redeemedBy.fullName || voucher.redeemedBy.email || 'Unknown Vendor',
+        totalScans: 0,
+        salesScans: 0,
+        voucherScans: 0,
+        voucherSubsidy: 0,
+        grossRevenue: 0,
+        platformFee: 0,
+        netPayout: 0,
+      });
+    }
+
+    const entry = vendorMap.get(vId);
+    const subsidy = voucher.faceValue ? parseFloat(voucher.faceValue.toString()) : 500.00;
+    entry.totalScans += 1;
+    entry.voucherScans = (entry.voucherScans || 0) + 1;
+    entry.voucherSubsidy = round2((entry.voucherSubsidy || 0) + subsidy);
+    entry.grossRevenue = round2(entry.grossRevenue + subsidy);
+    // Organizer subsidizes meal vouchers at 100% net payout to the vendor (0% fee)
+    entry.netPayout = round2(entry.netPayout + subsidy);
+  }
+
+  // Calculate formatted final numbers per vendor
   const vendors = Array.from(vendorMap.values()).map((v) => {
     const grossRevenue = round2(v.grossRevenue);
-    const platformFee = round2(grossRevenue * splitRate);
-    const netPayout = round2(grossRevenue - platformFee);
+    const platformFee = round2(v.platformFee);
+    const netPayout = round2(v.netPayout);
+    const voucherSubsidy = round2(v.voucherSubsidy || 0);
     return {
       ...v,
+      salesScans: v.salesScans || 0,
+      voucherScans: v.voucherScans || 0,
+      voucherSubsidy,
       grossRevenue,
       platformFee,
       netPayout,
@@ -152,6 +196,9 @@ export const getVendorPayoutData = async () => {
   });
 
   const totalScans = vendors.reduce((acc, v) => acc + v.totalScans, 0);
+  const totalSalesScans = vendors.reduce((acc, v) => acc + v.salesScans, 0);
+  const totalVoucherScans = vendors.reduce((acc, v) => acc + v.voucherScans, 0);
+  const totalVoucherSubsidies = round2(vendors.reduce((acc, v) => acc + v.voucherSubsidy, 0));
   const totalGrossRevenue = round2(vendors.reduce((acc, v) => acc + v.grossRevenue, 0));
   const totalPlatformFee = round2(vendors.reduce((acc, v) => acc + v.platformFee, 0));
   const totalNetPayout = round2(totalGrossRevenue - totalPlatformFee);
@@ -161,6 +208,9 @@ export const getVendorPayoutData = async () => {
     summary: {
       totalVendors: vendors.length,
       totalScans,
+      totalSalesScans,
+      totalVoucherScans,
+      totalVoucherSubsidies,
       totalGrossRevenue,
       totalPlatformFee,
       totalNetPayout,

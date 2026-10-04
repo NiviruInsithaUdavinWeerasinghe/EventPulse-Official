@@ -49,21 +49,9 @@ export const processVendorCheckout = async (req, res) => {
       const customerUserId = voucher.user.toString();
       const currentBalance = wallet ? parseFloat(wallet.balance.toString()) : 0;
 
-      // Create attendee zero-charge ledger entry
-      let ledgerId = null;
-      if (wallet) {
-        const ledger = await WalletLedger.create({
-          wallet: wallet._id,
-          transactionType: 'Debit',
-          amount: mongoose.Types.Decimal128.fromString('0.00'),
-          balanceBefore: mongoose.Types.Decimal128.fromString(currentBalance.toFixed(2)),
-          balanceAfter: mongoose.Types.Decimal128.fromString(currentBalance.toFixed(2)),
-          description: `Digital Voucher Redeemed (Organizer Subsidized: LKR ${subsidyAmount.toFixed(2)}): ${voucher.code}`,
-          referenceType: 'Voucher',
-          referenceId: voucher._id.toString(),
-        });
-        ledgerId = ledger._id.toString();
-      }
+      // Note: Attendee wallet balance does not change (0 charge), so no debit entry is written to WalletLedger.
+      // (WalletLedger schema enforces amount > 0.00 for financial movements).
+      let ledgerId = voucher._id.toString();
 
       // Fetch vendor details & application for settlement audit
       const vendorUser = await User.findById(req.user.id);
@@ -275,7 +263,38 @@ export const getSalesPerformance = async (req, res) => {
       .populate('user', 'fullName')
       .sort({ createdAt: 1 });
 
+    // Also fetch redeemed Scavenger Hunt food vouchers redeemed by this vendor
+    const voucherQuery = { redeemedBy: req.user.id, status: 'Redeemed' };
+    const vouchers = await Voucher.find(voucherQuery)
+      .populate('user', 'fullName')
+      .sort({ redeemedAt: 1 });
+
     const platformSplitPercentage = process.env.PLATFORM_SPLIT_PERCENTAGE ? parseFloat(process.env.PLATFORM_SPLIT_PERCENTAGE) : 5.0;
+
+    // Build unified transactions list and sort chronologically
+    const allTransactions = [
+      ...tokens.map((t) => ({
+        type: 'token',
+        id: t._id.toString(),
+        customerName: t.user ? t.user.fullName : 'Customer',
+        gross: parseFloat(t.debitedAmount?.toString() || '0'),
+        // Platform fee applies to standard sales
+        isVoucher: false,
+        timestamp: t.createdAt,
+        eventId: t.eventId ? t.eventId.toString() : null,
+      })),
+      ...vouchers.map((v) => ({
+        type: 'voucher',
+        id: v._id.toString(),
+        customerName: v.user ? v.user.fullName : 'Quest Winner',
+        gross: parseFloat(v.faceValue?.toString() || '500'),
+        // Organizer reimburses voucher subsidy in full to the vendor without platform commission deduction
+        isVoucher: true,
+        voucherCode: v.code,
+        timestamp: v.redeemedAt || v.updatedAt,
+        eventId: null,
+      })),
+    ].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
     let totalGrossSales = 0;
     let totalPlatformFee = 0;
@@ -284,9 +303,10 @@ export const getSalesPerformance = async (req, res) => {
     const chartData = [];
     const timeline = [];
 
-    for (const token of tokens) {
-      const gross = parseFloat(token.debitedAmount?.toString() || '0');
-      const fee = gross * (platformSplitPercentage / 100.0);
+    for (const tx of allTransactions) {
+      const gross = tx.gross;
+      // Organizer vouchers are full subsidies (0 platform fee deduction)
+      const fee = tx.isVoucher ? 0 : gross * (platformSplitPercentage / 100.0);
       const net = gross - fee;
 
       totalGrossSales += gross;
@@ -295,20 +315,22 @@ export const getSalesPerformance = async (req, res) => {
 
       // Cumulative data point for visualization
       chartData.push({
-        timestamp: token.createdAt,
+        timestamp: tx.timestamp,
         grossAmount: parseFloat(gross.toFixed(2)),
         netAmount: parseFloat(net.toFixed(2)),
         cumulativeNet: parseFloat(totalNetEarnings.toFixed(2)),
       });
 
       timeline.push({
-        transactionId: token._id.toString(),
-        customerName: token.user ? token.user.fullName : 'Customer',
+        transactionId: tx.id,
+        customerName: tx.customerName,
         grossAmount: parseFloat(gross.toFixed(2)),
         platformSplit: parseFloat(fee.toFixed(2)),
         netAmount: parseFloat(net.toFixed(2)),
-        timestamp: token.createdAt,
-        eventId: token.eventId ? token.eventId.toString() : null,
+        timestamp: tx.timestamp,
+        eventId: tx.eventId,
+        isVoucher: tx.isVoucher,
+        voucherCode: tx.voucherCode || null,
       });
     }
 
