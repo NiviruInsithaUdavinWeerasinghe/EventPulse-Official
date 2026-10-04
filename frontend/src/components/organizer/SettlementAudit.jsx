@@ -697,31 +697,47 @@ function VendorPayoutsTab() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
-        <div className="bg-white dark:bg-zinc-900/40 border border-slate-200/80 dark:border-zinc-800/80 rounded-2xl p-5 shadow-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="bg-white dark:bg-zinc-900/40 border border-slate-200/80 dark:border-zinc-800/80 rounded-2xl p-4 shadow-sm">
           <span className="text-xs font-semibold text-slate-500 uppercase">Total Vendors</span>
           <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white mt-1">{summary.totalVendors}</h3>
+          <p className="text-[11px] text-slate-400 mt-1">{summary.totalScans} Total Checkouts</p>
         </div>
 
-        <div className="bg-white dark:bg-zinc-900/40 border border-slate-200/80 dark:border-zinc-800/80 rounded-2xl p-5 shadow-sm">
-          <span className="text-xs font-semibold text-slate-500 uppercase">Gross Revenue (LKR)</span>
+        <div className="bg-white dark:bg-zinc-900/40 border border-slate-200/80 dark:border-zinc-800/80 rounded-2xl p-4 shadow-sm">
+          <span className="text-xs font-semibold text-slate-500 uppercase">Gross Volume</span>
           <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white mt-1">
             Rs. {summary.totalGrossRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
           </h3>
+          <p className="text-[11px] text-slate-400 mt-1">All Scans & Checkouts</p>
         </div>
 
-        <div className="bg-white dark:bg-zinc-900/40 border border-slate-200/80 dark:border-zinc-800/80 rounded-2xl p-5 shadow-sm">
+        <div className="bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200/80 dark:border-purple-800/50 rounded-2xl p-4 shadow-sm">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-700 dark:purple-400 uppercase">
+            <span>🎟️ Quest Subsidies</span>
+          </div>
+          <h3 className="text-2xl font-extrabold text-purple-700 dark:text-purple-300 mt-1">
+            Rs. {(summary.totalVoucherSubsidies || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          </h3>
+          <p className="text-[11px] text-purple-600/80 dark:text-purple-400/80 mt-1">
+            {summary.totalVoucherScans || 0} Quest Vouchers (0% Fee)
+          </p>
+        </div>
+
+        <div className="bg-white dark:bg-zinc-900/40 border border-slate-200/80 dark:border-zinc-800/80 rounded-2xl p-4 shadow-sm">
           <span className="text-xs font-semibold text-slate-500 uppercase">Platform Fee ({splitPercentage}%)</span>
           <h3 className="text-2xl font-extrabold text-amber-600 dark:text-amber-400 mt-1">
             Rs. {summary.totalPlatformFee.toLocaleString(undefined, { minimumFractionDigits: 2 })}
           </h3>
+          <p className="text-[11px] text-slate-400 mt-1">{splitPercentage}% on Standard Sales</p>
         </div>
 
-        <div className="bg-white dark:bg-zinc-900/40 border border-slate-200/80 dark:border-zinc-800/80 rounded-2xl p-5 shadow-sm">
-          <span className="text-xs font-semibold text-slate-500 uppercase">Final Net Payouts (LKR)</span>
+        <div className="bg-emerald-50/40 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-800/50 rounded-2xl p-4 shadow-sm">
+          <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 uppercase">Final Net Payouts</span>
           <h3 className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-1">
             Rs. {summary.totalNetPayout.toLocaleString(undefined, { minimumFractionDigits: 2 })}
           </h3>
+          <p className="text-[11px] text-emerald-600/80 dark:text-emerald-400/80 mt-1">Gross − Fee + 100% Subsidies</p>
         </div>
       </div>
 
@@ -747,8 +763,9 @@ function VendorPayoutsTab() {
               <tr className="border-b border-slate-100 dark:border-zinc-800 text-slate-400 font-semibold uppercase tracking-wider">
                 <th className="pb-3 pr-4">Vendor ID</th>
                 <th className="pb-3 px-4">Vendor Name</th>
-                <th className="pb-3 px-4">Total Scans</th>
-                <th className="pb-3 px-4">Gross Revenue (LKR)</th>
+                <th className="pb-3 px-4">Checkouts & Scans</th>
+                <th className="pb-3 px-4">Gross Volume (LKR)</th>
+                <th className="pb-3 px-4">Quest Subsidies (0% Fee)</th>
                 <th className="pb-3 px-4">Platform Fee ({splitPercentage}%)</th>
                 <th className="pb-3 px-4">Final Net Payout (LKR)</th>
               </tr>
@@ -759,15 +776,31 @@ function VendorPayoutsTab() {
                   <tr key={v.vendorId} className="hover:bg-slate-50/50 dark:hover:bg-zinc-800/20">
                     <td className="py-3.5 pr-4 font-mono font-semibold text-slate-900 dark:text-white">{v.vendorId}</td>
                     <td className="py-3.5 px-4 font-bold">{v.vendorName}</td>
-                    <td className="py-3.5 px-4 font-semibold">{v.totalScans}</td>
+                    <td className="py-3.5 px-4 font-semibold">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-bold text-slate-800 dark:text-slate-100">{v.totalScans} total</span>
+                        {v.voucherScans > 0 && (
+                          <span className="inline-flex items-center text-[10px] bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300 font-bold px-1.5 py-0.5 rounded-full">
+                            🎟️ {v.voucherScans} Quest
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">Rs. {v.grossRevenue.toFixed(2)}</td>
+                    <td className="py-3.5 px-4 text-purple-700 dark:text-purple-300 font-bold">
+                      {v.voucherSubsidy > 0 ? (
+                        <span>Rs. {v.voucherSubsidy.toFixed(2)}</span>
+                      ) : (
+                        <span className="text-slate-400 font-normal">Rs. 0.00</span>
+                      )}
+                    </td>
                     <td className="py-3.5 px-4 text-amber-600 font-semibold">-Rs. {v.platformFee.toFixed(2)}</td>
-                    <td className="py-3.5 px-4 text-emerald-600 font-extrabold">Rs. {v.netPayout.toFixed(2)}</td>
+                    <td className="py-3.5 px-4 text-emerald-600 font-extrabold text-sm">Rs. {v.netPayout.toFixed(2)}</td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="6" className="py-8 text-center text-slate-400">
+                  <td colSpan="7" className="py-8 text-center text-slate-400">
                     No vendor payout records found.
                   </td>
                 </tr>

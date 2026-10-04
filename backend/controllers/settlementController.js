@@ -39,11 +39,24 @@ export const exportVendorPayoutCsv = async (req, res) => {
     const data = await getVendorPayoutData();
     
     // Format headers and rows for CSV
-    const headers = ['Vendor ID', 'Vendor Name', 'Total Scans', 'Gross Revenue (LKR)', 'Platform Fee (LKR)', 'Final Net Payout (LKR)'];
+    const headers = [
+      'Vendor ID',
+      'Vendor Name',
+      'Total Scans',
+      'Sales Scans',
+      'Quest Vouchers',
+      'Voucher Subsidy (LKR)',
+      'Gross Revenue (LKR)',
+      'Platform Fee (LKR)',
+      'Final Net Payout (LKR)',
+    ];
     const rows = data.vendors.map((v) => [
       `"${v.vendorId}"`,
       `"${v.vendorName.replace(/"/g, '""')}"`,
       v.totalScans,
+      v.salesScans || 0,
+      v.voucherScans || 0,
+      (v.voucherSubsidy || 0).toFixed(2),
       v.grossRevenue.toFixed(2),
       v.platformFee.toFixed(2),
       v.netPayout.toFixed(2),

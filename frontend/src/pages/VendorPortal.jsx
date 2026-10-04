@@ -128,9 +128,9 @@ export default function VendorPortal() {
     },
     {
       icon: '💳',
-      title: 'Checkout system (POS)',
-      desc: 'Process transactions, apply discounts, manage your item catalogue, and handle payments at the point of sale.',
-      label: 'Open POS',
+      title: 'Checkout System (POS)',
+      desc: 'Process contactless payments, scan attendee wallet QRs, or redeem 6-marker Scavenger Hunt food vouchers with organizer subsidy.',
+      label: 'Open POS & Voucher Scanner',
       route: '/vendor/pos',
       color: 'emerald',
     },
